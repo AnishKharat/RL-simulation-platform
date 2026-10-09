@@ -72,6 +72,12 @@ def test_linearizable_flag_agrees_with_get_linearization(cls: type[_Dummy]) -> N
     assert env.env_metadata.linearizable == (env.get_linearization() is not None)
 
 
+def test_simulated_defaults_true_and_hardware_round_trips() -> None:
+    assert _Dummy.env_metadata.simulated is True
+    hw = _Dummy.env_metadata.model_copy(update={"simulated": False})
+    assert EnvMetadata.model_validate_json(hw.model_dump_json()).simulated is False
+
+
 def test_concrete_subclass_defaults() -> None:
     env = _Dummy()
     assert env.get_linearization() is None

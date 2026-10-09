@@ -26,6 +26,10 @@ class BaseEnvironment(gym.Env[Any, Any], ABC):
       consecutive in-tolerance steps (both flags False then). `truncated` = the
       `TaskSpec.horizon_steps`
       time limit. They are never both True.
+    * Hardware: an environment with `env_metadata.simulated == False` (real robot via the
+      ros_adapter) cannot honour the determinism clause above. The experiment manager then
+      refuses seeded-reproducibility and multi-seed benchmark claims for it, and blocks
+      training on it (evaluation of an already trained controller is allowed).
     * `env_metadata` (class level, `EnvMetadata`) is readable without instantiation and is
       what the registry/frontend use. It is distinct from gymnasium's `metadata` dict
       (render modes/fps), which subclasses still define as usual.

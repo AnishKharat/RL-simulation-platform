@@ -43,6 +43,10 @@ class EnvMetadata(_Spec):
     single discrete choice); `linearizable` is True iff `get_linearization()` returns a model
     (a test per environment asserts the two agree). The registry compares these with the
     controller's declarations.
+
+    `simulated` is False for hardware-in-the-loop environments (Phase 7 ros_adapter): they have
+    no seeded determinism, so the experiment manager refuses multi-seed reproducibility
+    claims for them and blocks training on them (see `BaseEnvironment`).
     """
 
     name: str
@@ -52,6 +56,7 @@ class EnvMetadata(_Spec):
     action_space_kind: ActionSpaceKind
     action_dim: int = Field(default=1, ge=1)
     linearizable: bool = False
+    simulated: bool = True
     physics_backend: str
 
 
