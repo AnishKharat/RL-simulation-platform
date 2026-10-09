@@ -9,7 +9,7 @@ comparison (same seeds, same stopping rules, same recording of true states) then
 being identical, and RL wrappers would duplicate the loop around `model.predict`.
 
 ## Decision
-- Remove abstract `evaluate` from `BaseController`. Controllers expose `configure`, `reset`, `predict`, `train`,
+- Remove abstract `evaluate` from `BaseController`. Controllers expose `configure`, `reset` (per-episode state clear, default no-op, called by `rollout` after `env.reset`), `predict`, `train`,
   `save`, `load` only.
 - The experiments layer owns one shared function `rollout(env, controller, n_episodes, seed) -> list[EpisodeTrajectory]`.
   Contract: episode `i` calls `env.reset(seed=seed + i)`, then loops `controller.predict(obs)` / `env.step(action)`

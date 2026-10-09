@@ -34,6 +34,10 @@ class BaseController(ABC):
     * `requires_training` is False for classical controllers; their `train` is a no-op
       returning `TrainResult(timesteps=0)`. Controllers see environments only through
       `BaseEnvironment` and `EnvSpec`, never a concrete robot.
+    * `reset()` is called by the rollout at the start of every episode (after `env.reset`, before
+      the first `predict`) to clear per-episode internal state (PID integrator and previous
+      error, RNN hidden state, MPC warm start). Default: no-op. It must not touch learned
+      parameters.
     * `predict(obs, deterministic=True)` is a pure function of the controller's state and
       `obs`; any stochasticity must come from RNGs seeded via `configure`/`train` config,
       never from global RNG state.
@@ -50,6 +54,9 @@ class BaseController(ABC):
     @abstractmethod
     def configure(self, env_spec: EnvSpec, params: dict[str, Any]) -> None:
         """Bind to an environment description and hyperparameters (see class contract)."""
+
+    def reset(self) -> None:  # noqa: B027 - intentional optional hook
+        """Clear per-episode state; called once per episode by `rollout`. Default: no-op."""
 
     @abstractmethod
     def predict(self, obs: np.ndarray, deterministic: bool = True) -> Action:

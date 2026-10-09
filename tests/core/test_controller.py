@@ -48,3 +48,7 @@ def test_default_train_is_noop() -> None:
 def test_evaluate_is_not_part_of_the_contract() -> None:
     assert not hasattr(BaseController, "evaluate")
     assert "evaluate" not in BaseController.__abstractmethods__
+
+
+def test_default_reset_is_noop() -> None:
+    assert _Const().reset() is None
