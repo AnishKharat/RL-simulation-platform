@@ -125,35 +125,41 @@ class TaskSpec(_Spec):
     controller (fair-comparison protocol, project_context 6.8). Failure semantics (e.g. pole
     falls) are described in `failure_description` and signalled via `terminated`.
 
-    Metric signal: the scalar output is y = state[error_state_index] with reference
-    `y_ref = setpoint[error_state_index]` (a derived property, so it cannot disagree with
-    `setpoint`). The 2% settling band is |y - y_ref| <= 0.02 * max(|y_ref - y(0)|, step_floor);
-    `step_floor` is the minimum step size used when the commanded step is ~0. `angle_wrap`
-    is True when y is an angle (errors are wrapped to (-pi, pi]). The episode time limit is
+    Metric signal: the output is the vector y = state[error_state_indices] (at least one
+    component) with reference `y_ref = setpoint[error_state_indices]` (a derived property, so
+    it cannot disagree with `setpoint`). Per-component differences are wrapped to (-pi, pi]
+    for the state indices listed in `wrap_indices` (angles) and left as is otherwise; the
+    error is the Euclidean norm of the wrapped differences (metrics/DEFINITIONS.md). With one
+    index this is the scalar |y - y_ref|. The 2% settling band is
+    e <= 0.02 * max(S, step_floor) with S = ||y_ref - y(0)||; `step_floor` is the minimum step
+    size used when the commanded step is ~0. The episode time limit is
     T_max = horizon_steps * EnvSpec.dt (there is no separate time-limit field).
     """
 
     setpoint: tuple[float, ...]
     tolerance: tuple[float, ...]
-    error_state_index: int = Field(ge=0)
+    error_state_indices: tuple[int, ...] = Field(min_length=1)
+    wrap_indices: tuple[int, ...] = ()
     step_floor: float = Field(gt=0)
     horizon_steps: int = Field(gt=0)
     success_hold_steps: int = Field(default=1, gt=0)
-    angle_wrap: bool = False
     failure_description: str = ""
 
     @model_validator(mode="after")
     def _check_shapes(self) -> TaskSpec:
         if len(self.tolerance) != len(self.setpoint):
             raise ValueError("tolerance and setpoint must have equal length")
-        if self.error_state_index >= len(self.setpoint):
-            raise ValueError("error_state_index out of range for setpoint")
+        idx = self.error_state_indices
+        if len(set(idx)) != len(idx) or any(not 0 <= i < len(self.setpoint) for i in idx):
+            raise ValueError("error_state_indices must be unique and within setpoint range")
+        if not set(self.wrap_indices) <= set(idx):
+            raise ValueError("wrap_indices must be a subset of error_state_indices")
         return self
 
     @property
-    def y_ref(self) -> float:
-        """Reference of the scalar output: `setpoint[error_state_index]`."""
-        return self.setpoint[self.error_state_index]
+    def y_ref(self) -> tuple[float, ...]:
+        """Reference of the output vector: `setpoint[i] for i in error_state_indices`."""
+        return tuple(self.setpoint[i] for i in self.error_state_indices)
 
 
 class TrainConfig(_Spec):

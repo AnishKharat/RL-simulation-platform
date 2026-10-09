@@ -6,11 +6,12 @@ Each metric is a pure function `metric(traj: EpisodeTrajectory, task: TaskSpec) 
 
 An `EpisodeTrajectory` has samples `k = 0..N-1` at fixed step `dt` (s), time `t_k = k*dt`, and per step: true state `x_k` (`env.get_state()`), applied action `u_k` (physical units; discrete actions are mapped to their applied value by the environment), reward `r_k`, plus flags `terminated`, `truncated`. `TaskSpec` supplies:
 
-- `y(x) = x[error_state_index]`: the controlled output (e.g. pole angle in rad) and `y_ref = setpoint[error_state_index]`: its reference (derived, not stored separately).
-- `T_max = horizon_steps * dt` (s; there is no separate time-limit field) and `angle_wrap` (default false; true for angular outputs).
+- `y(x) = x[error_state_indices]`: the controlled output vector (at least one component, e.g. pole angle in rad) and `y_ref = setpoint[error_state_indices]`: its reference (derived, not stored separately).
+- `wrap_indices` (subset of `error_state_indices`): output components that are angles.
+- `T_max = horizon_steps * dt` (s; there is no separate time-limit field).
 - `step_floor` (`S_min`): smallest step size treated as a real step response.
 
-Error `e_k = wrap(y(x_k) - y_ref)`, where `wrap` maps to (-pi, pi] for angles and is the identity otherwise. Step size `S = |y_ref - y(x_0)|`. Episode duration `T = N*dt`.
+Per-component difference `d_k = wrap(y(x_k) - y_ref)`, where `wrap` maps the components in `wrap_indices` to (-pi, pi] and is the identity for the others. Error `e_k = ||d_k||_2` (Euclidean norm; for one component, `|y - y_ref|`). Step size `S = ||wrap(y_ref - y(x_0))||_2`. Episode duration `T = N*dt`.
 
 A metric returns `(value, status, unit)`. `status` is `ok`, `censored` (value is a defined bound, e.g. never settled) or `undefined` (value is NaN).
 
@@ -25,7 +26,7 @@ An episode terminated early by failure keeps the metrics of its `N` recorded ste
 
 ## Phase 2 metrics
 
-All use the error signal above. Define the normalized progress `p_k = (y(x_k) - y(x_0)) / (y_ref - y(x_0))` (0 at start, 1 at the setpoint), only when `S >= S_min`.
+All use the error signal above. Define the normalized step progress `p_k = <w_k, w_ref> / S^2` with `w_k = wrap(y(x_k) - y(x_0))` and `w_ref = wrap(y_ref - y(x_0))` (0 at start, 1 at the setpoint, the projection of the motion onto the commanded step), only when `S >= S_min`. For one component this equals `(y(x_k) - y(x_0)) / (y_ref - y(x_0))`.
 
 **settling_time (2% band).** Band half-width `b = 0.02 * max(S, S_min)`. Settling index `k_s = min { k : abs(e_j) <= b for all j >= k }`. Value `t_{k_s}`.
 - Already inside the band for the whole episode: `0`.

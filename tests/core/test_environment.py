@@ -52,7 +52,7 @@ class _Dummy(BaseEnvironment):
         return TaskSpec(
             setpoint=(0.0,),
             tolerance=(0.1,),
-            error_state_index=0,
+            error_state_indices=(0,),
             step_floor=0.05,
             horizon_steps=5,
         )
