@@ -1,4 +1,5 @@
 """Run only via: pytest spikes/fastapi_background_job (not collected by root `pytest`)."""
+
 from __future__ import annotations
 
 import threading

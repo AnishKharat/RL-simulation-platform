@@ -4,6 +4,7 @@ POST /jobs        -> ThreadPoolExecutor (recommended)
 POST /bg_jobs     -> FastAPI BackgroundTasks (for comparison)
 GET  /jobs/{id}   -> {status: queued|running|done|failed, progress, result, error}
 """
+
 from __future__ import annotations
 
 import threading

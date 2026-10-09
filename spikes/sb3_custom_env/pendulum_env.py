@@ -1,4 +1,5 @@
 """Spike: minimal continuous-action inverted pendulum with own dynamics (Gymnasium API)."""
+
 from __future__ import annotations
 
 from typing import Any

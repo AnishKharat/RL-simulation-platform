@@ -1,4 +1,5 @@
 """Run only via: pytest spikes/sb3_custom_env (not collected by root `pytest`)."""
+
 from __future__ import annotations
 
 import numpy as np

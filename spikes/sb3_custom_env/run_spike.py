@@ -1,4 +1,5 @@
 """Train PPO briefly, compare to a PID controller on the same env. Run: python run_spike.py"""
+
 from __future__ import annotations
 
 import time
@@ -36,9 +37,9 @@ def rollout(env: TinyPendulumEnv, act: Act, seed: int) -> tuple[float, np.ndarra
 
 
 def train(steps: int = 4096, seed: int = 0) -> sb3.PPO:
-    return sb3.PPO(
-        "MlpPolicy", TinyPendulumEnv(), seed=seed, device="cpu", n_steps=512
-    ).learn(total_timesteps=steps)
+    return sb3.PPO("MlpPolicy", TinyPendulumEnv(), seed=seed, device="cpu", n_steps=512).learn(
+        total_timesteps=steps
+    )
 
 
 def main() -> None:
