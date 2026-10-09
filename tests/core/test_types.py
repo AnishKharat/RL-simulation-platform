@@ -88,4 +88,13 @@ def test_metadata_and_specs_round_trip() -> None:
         n_actions=2,
     )
     assert EnvSpec.model_validate_json(es.model_dump_json()) == es
-    TaskSpec(setpoint=(0.0,), tolerance=(0.1,), horizon_steps=10)
+    ts = TaskSpec(
+        setpoint=(0.0,),
+        tolerance=(0.1,),
+        error_state_index=0,
+        y_ref=0.0,
+        step_floor=0.05,
+        time_limit_s=0.2,
+        horizon_steps=10,
+    )
+    assert TaskSpec.model_validate_json(ts.model_dump_json()) == ts

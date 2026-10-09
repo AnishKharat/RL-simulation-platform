@@ -83,10 +83,19 @@ class TaskSpec(_Spec):
     steps before the episode ends. `horizon_steps` is the time limit applied to every
     controller (fair-comparison protocol, project_context 6.8). Failure semantics (e.g. pole
     falls) are described in `failure_description` and signalled via `terminated`.
+
+    Metric signal: the scalar output is y = state[error_state_index], its reference is `y_ref`
+    (the 2% settling band is |y - y_ref| <= 0.02 * max(|y_ref - y(0)|, step_floor); `step_floor`
+    is the minimum step size used when the commanded step is ~0). `time_limit_s` equals
+    horizon_steps * dt of the environment.
     """
 
     setpoint: tuple[float, ...]
     tolerance: tuple[float, ...]
+    error_state_index: int = Field(ge=0)
+    y_ref: float
+    step_floor: float = Field(gt=0)
+    time_limit_s: float = Field(gt=0)
     horizon_steps: int = Field(gt=0)
     success_hold_steps: int = Field(default=1, gt=0)
     failure_description: str = ""
