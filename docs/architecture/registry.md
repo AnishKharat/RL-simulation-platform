@@ -38,7 +38,7 @@ Violations raise `RegistryError`.
 `Entry(kind, id, cls, metadata, params_model)`; `metadata` is `cls.metadata` (core's `EnvMetadata` /
 `ControllerMetadata`). `Entry.info()` returns the API-facing dict:
 `{id, kind, metadata: <model_dump>, params_schema: params_model.model_json_schema() or {}}` so the frontend renders
-forms from `params_schema` with no per-robot code. `Entry.validate_params(raw)` validates through the model.
+forms from `params_schema` with no per-robot code. `Registry.entries(kind)` lists; `Entry.validate_params(raw)` validates through the model.
 
 **Needed from core** (registry only reads these structurally, via Protocols):
 - `EnvMetadata.action_space_kind: Literal["discrete", "continuous"]`
