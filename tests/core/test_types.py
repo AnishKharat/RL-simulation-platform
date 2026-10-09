@@ -47,6 +47,9 @@ def test_trajectory_valid() -> None:
         {"dt": 0.0},
         {"terminated": True, "truncated": True},
         {"rewards": np.zeros((3, 1))},
+        {"commanded_actions": np.zeros((2, 1))},
+        {"perturbation_steps": (3,)},
+        {"perturbation_steps": (-1,)},
     ],
 )
 def test_trajectory_invariants(kw: dict[str, Any]) -> None:
@@ -181,3 +184,10 @@ def test_task_spec_derived_y_ref_and_validation() -> None:
 def test_success_episode_has_neither_flag() -> None:
     tr = _traj(terminated=False, truncated=False, success=True)
     assert tr.success and not (tr.terminated or tr.truncated)
+
+
+def test_trajectory_optional_commanded_actions_and_perturbation_steps() -> None:
+    tr = _traj()
+    assert tr.commanded_actions is None and tr.perturbation_steps == ()
+    tr2 = _traj(commanded_actions=np.full((3, 1), 9.0), perturbation_steps=(0, 2))
+    assert tr2.commanded_actions is not None and tr2.perturbation_steps == (0, 2)

@@ -46,6 +46,7 @@ erDiagram
         int    seed
         json   derived_seeds
         json   versions "python, libs, platform"
+        json   task_spec "TaskSpec snapshot used for metrics"
         string code_version "git sha, dirty flag"
         json   error "nullable"
         string error_stage "nullable"
@@ -60,6 +61,7 @@ erDiagram
         int    seed
         bool   terminated
         bool   truncated
+        bool   success "TaskSpec success judged by the env"
         int    n_steps
         string trajectory_artifact_id FK
     }
@@ -70,7 +72,7 @@ erDiagram
         string metric_name
         float  value "nullable if NaN"
         string unit
-        string status "ok or undefined"
+        string status "ok, censored or undefined"
     }
     AGGREGATE_RESULT {
         string id PK
@@ -79,6 +81,7 @@ erDiagram
         string controller_id
         string metric_name
         int    n_seeds
+        int    n_censored "runs whose value is censored"
         float  mean
         float  ci_low
         float  ci_high
@@ -99,8 +102,9 @@ erDiagram
 
 - **Experiment** is the reusable definition (config), **Run** is one execution. Phase 1 creates exactly one Run per Experiment. A multi-seed benchmark creates one Run per seed under a shared Experiment (decided in ADR 0009), so aggregation needs only a `GROUP BY experiment_id`. This works because `config_hash` excludes `seed` and `name`, and `RUN.seed` is the authoritative seed of each run (`config.seed` is only the default).
 - **EpisodeTrajectory** is not a table (`EPISODE.n_steps` is `T`: states and observations have T+1 rows, actions and rewards T). The DB holds an `EPISODE` row with a pointer to the trajectory artifact (see below).
-- **METRIC_RESULT** has one row per (run, episode, metric_name). Rows with `episode_id` NULL hold run-level scalars (e.g. final training return). `value` is NULL and `status = undefined` when a metric is not defined for that episode (see `rcl/metrics/DEFINITIONS.md`).
-- **AGGREGATE_RESULT** is a cache of cross-seed statistics (mean, CI) that `analytics` can always recompute. Introduced in Phase 2; Phase 1 does not need it.
+- **METRIC_RESULT** has one row per (run, episode, metric_name). Rows with `episode_id` NULL hold run-level scalars (e.g. final training return). `status` is `ok`, `censored` (a defined bound, value present) or `undefined` (`value` NULL, metric not defined for that episode) (see `rcl/metrics/DEFINITIONS.md`).
+- **RUN.task_spec** is the JSON snapshot of the `TaskSpec` in force (setpoint, tolerance, output indices, horizon), so metrics can be recomputed from stored trajectories even if the environment code later changes. **EPISODE.success** stores the env's success verdict per episode (success rate needs no trajectory load).
+- **AGGREGATE_RESULT** is a cache of cross-seed statistics (mean, CI, `n_censored`) that `analytics` can always recompute. Introduced in Phase 2; Phase 1 does not need it.
 - **BENCHMARK_SUITE / BENCHMARK_RUN** appear in Phase 2. The suite stores the grid; the same seeds, episode count, initial-state distribution and time limit apply to every cell (§6.8). Phase 4 robustness suites reuse this with a `perturbations` list inside `spec`.
 
 ## Reproducibility fields
@@ -131,6 +135,6 @@ Rule: the DB can answer every comparison query without MLflow running. MLflow is
 
 ## Trajectories as artifacts
 
-- An `EpisodeTrajectory` (time, states, observations, actions, rewards, flags, task spec snapshot) is written once per episode to the artifact store as a compressed `.npz` (arrays only, no pickle), at `artifacts/<run_id>/episodes/<index>.npz`. The store is a local directory now; an object-store URI later, with the same `ARTIFACT.uri` column.
+- An `EpisodeTrajectory` (time, states, observations, actions, `commanded_actions` (raw `predict` output, when recorded), rewards, flags, `perturbation_steps`; the task spec snapshot lives on `RUN.task_spec`) is written once per episode to the artifact store as a compressed `.npz` (arrays only, no pickle), at `artifacts/<run_id>/episodes/<index>.npz`. The store is a local directory now; an object-store URI later, with the same `ARTIFACT.uri` column.
 - Rationale: trajectories are large and read in bulk, so they stay out of the DB. Metrics are pure functions of the trajectory, so they can be recomputed from the artifact if a definition changes; `sha256` guards integrity.
 - Directory `artifacts/` is git-ignored.

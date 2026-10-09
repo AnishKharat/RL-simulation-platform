@@ -247,7 +247,12 @@ class EpisodeTrajectory:
     With T = number of steps taken:
       observations, states: first axis T+1 (index 0 is the post-reset value);
       actions: first axis T; rewards: shape (T,); dt: control period in seconds.
-    `terminated` (task failure only) and `truncated` (time limit) are never both True; both are
+    `commanded_actions` (optional, shape (T, ...)) is the controller's RAW `predict` output
+    before the environment clipped/mapped it, while `actions` are the values actually applied
+    (physical units); metrics use `actions`. `perturbation_steps` lists the step indices
+    `k` in [0, T) at which a perturbation was injected (empty without perturbations), used by
+    recovery-time metrics. `terminated` (task failure only) and `truncated` (time limit) are
+    never both True; both are
     False when the episode ended on success (`success_hold_steps` reached). `success` is judged
     by the environment's TaskSpec. `seed` is the reset seed.
     """
@@ -261,9 +266,15 @@ class EpisodeTrajectory:
     truncated: bool
     seed: int
     success: bool
+    commanded_actions: np.ndarray | None = None
+    perturbation_steps: tuple[int, ...] = ()
 
     def __post_init__(self) -> None:
         t = len(self.rewards)
+        if self.commanded_actions is not None and len(self.commanded_actions) != t:
+            raise ValueError("commanded_actions must have length T")
+        if any(not 0 <= k < t for k in self.perturbation_steps):
+            raise ValueError("perturbation_steps must be step indices in [0, T)")
         if self.rewards.ndim != 1:
             raise ValueError("rewards must be 1-D")
         if len(self.actions) != t:
