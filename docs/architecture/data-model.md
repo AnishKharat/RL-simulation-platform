@@ -98,7 +98,7 @@ erDiagram
 ## Notes on entities
 
 - **Experiment** is the reusable definition (config), **Run** is one execution. Phase 1 creates exactly one Run per Experiment. A multi-seed benchmark creates one Run per seed under a shared Experiment (decided in ADR 0009), so aggregation needs only a `GROUP BY experiment_id`. This works because `config_hash` excludes `seed` and `name`, and `RUN.seed` is the authoritative seed of each run (`config.seed` is only the default).
-- **EpisodeTrajectory** is not a table. The DB holds an `EPISODE` row with a pointer to the trajectory artifact (see below).
+- **EpisodeTrajectory** is not a table (`EPISODE.n_steps` is `T`: states and observations have T+1 rows, actions and rewards T). The DB holds an `EPISODE` row with a pointer to the trajectory artifact (see below).
 - **METRIC_RESULT** has one row per (run, episode, metric_name). Rows with `episode_id` NULL hold run-level scalars (e.g. final training return). `value` is NULL and `status = undefined` when a metric is not defined for that episode (see `rcl/metrics/DEFINITIONS.md`).
 - **AGGREGATE_RESULT** is a cache of cross-seed statistics (mean, CI) that `analytics` can always recompute. Introduced in Phase 2; Phase 1 does not need it.
 - **BENCHMARK_SUITE / BENCHMARK_RUN** appear in Phase 2. The suite stores the grid; the same seeds, episode count, initial-state distribution and time limit apply to every cell (§6.8). Phase 4 robustness suites reuse this with a `perturbations` list inside `spec`.
