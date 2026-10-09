@@ -1,6 +1,7 @@
 """Environment and controller registry. See docs/architecture/registry.md.
 
-Contract: imports only ``rcl.core`` (currently nothing; metadata is read structurally).
+Contract: imports only ``rcl.core``. Environments expose their static description as
+``cls.env_metadata`` (ADR 0012), controllers as ``cls.metadata``; both are type-checked on register.
 The default registry is the single piece of global state in the project.
 """
 
@@ -16,7 +17,14 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
+from rcl.core.types import ControllerMetadata, EnvMetadata
+
 Kind = Literal["environment", "controller"]
+# Class attribute holding the static metadata, and its required type, per kind.
+_META: dict[str, tuple[str, type[BaseModel]]] = {
+    "environment": ("env_metadata", EnvMetadata),
+    "controller": ("metadata", ControllerMetadata),
+}
 _ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
@@ -34,7 +42,8 @@ class UnknownIdError(RegistryError, KeyError):
 
 @dataclass(frozen=True)
 class Entry:
-    """One registered class. ``metadata`` is ``cls.metadata`` (core's Env/ControllerMetadata)."""
+    """One registered class. ``metadata`` is ``cls.env_metadata`` (environments) or
+    ``cls.metadata`` (controllers): core's ``EnvMetadata`` / ``ControllerMetadata``."""
 
     kind: Kind
     id: str
@@ -44,7 +53,7 @@ class Entry:
 
     def info(self) -> dict[str, Any]:
         """API/frontend-facing description: metadata plus the JSON schema for the param form."""
-        meta = self.metadata.model_dump() if hasattr(self.metadata, "model_dump") else self.metadata
+        meta = self.metadata.model_dump(mode="json")
         schema = self.params_model.model_json_schema() if self.params_model else {}
         return {"id": self.id, "kind": self.kind, "metadata": meta, "params_schema": schema}
 
@@ -67,8 +76,13 @@ class Registry:
         """Add an entry; raises RegistryError (bad entry) or DuplicateIdError."""
         if not _ID_RE.match(id):
             raise RegistryError(f"invalid {kind} id {id!r}: must match {_ID_RE.pattern}")
-        if not hasattr(cls, "metadata"):
-            raise RegistryError(f"{cls.__qualname__} has no `metadata` attribute")
+        attr, meta_type = _META[kind]
+        meta = getattr(cls, attr, None)
+        if not isinstance(meta, meta_type):
+            raise RegistryError(
+                f"{cls.__qualname__}.{attr} must be a {meta_type.__name__} instance, "
+                f"got {type(meta).__name__}"
+            )
         if params is not None and not (isinstance(params, type) and issubclass(params, BaseModel)):
             raise RegistryError(f"params for {id!r} must be a pydantic BaseModel subclass")
         existing = self._entries[kind].get(id)
@@ -78,7 +92,7 @@ class Registry:
             raise DuplicateIdError(
                 f"{kind} {id!r} already registered by {existing.cls.__qualname__}"
             )
-        self._entries[kind][id] = Entry(kind, id, cls, cls.metadata, params)
+        self._entries[kind][id] = Entry(kind, id, cls, meta, params)
 
     def get(self, kind: Kind, id: str) -> Entry:
         try:

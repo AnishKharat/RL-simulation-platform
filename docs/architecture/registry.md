@@ -30,20 +30,17 @@ class PID(BaseController): ...
 ```
 
 The decorator returns the class unchanged. Validation happens at decoration time (fail at import, not at run time):
-id matches `^[a-z][a-z0-9_]*$`; class has a `metadata` attribute; `params` (if given) is a `BaseModel` subclass.
+id matches `^[a-z][a-z0-9_]*$`; the class has the metadata attribute, of the right type (environments: `cls.env_metadata` must be an `EnvMetadata`; controllers: `cls.metadata` must be a `ControllerMetadata`, checked with `isinstance`, so gymnasium's own `metadata` dict can never be mistaken for it, ADR 0012); `params` (if given) is a `BaseModel` subclass.
 Violations raise `RegistryError`.
 
 ## 3. Entry contents
 
-`Entry(kind, id, cls, metadata, params_model)`; `metadata` is `cls.metadata` (core's `EnvMetadata` /
+`Entry(kind, id, cls, metadata, params_model)`; `metadata` is `cls.env_metadata` for environments and `cls.metadata` for controllers (core's `EnvMetadata` /
 `ControllerMetadata`). `Entry.info()` returns the API-facing dict:
 `{id, kind, metadata: <model_dump>, params_schema: params_model.model_json_schema() or {}}` so the frontend renders
 forms from `params_schema` with no per-robot code. `Registry.entries(kind)` lists; `Entry.validate_params(raw)` validates through the model.
 
-**Needed from core** (registry only reads these structurally, via Protocols):
-- `EnvMetadata.action_space_kind: Literal["discrete", "continuous"]`
-- `ControllerMetadata.supported_action_spaces: Collection[Literal["discrete", "continuous"]]`
-- both are Pydantic models (or at least expose `model_dump()`), and classes expose them as class attribute `metadata`.
+**From core:** the registry imports `EnvMetadata` / `ControllerMetadata` from `rcl.core.types` (allowed edge registry -> core) and reads `action_space_kind` (env) and `supported_action_spaces` (controller) from them directly.
 
 ## 4. Compatibility filtering
 
