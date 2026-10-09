@@ -1,6 +1,6 @@
 # Data Model
 
-SQLAlchemy models (SQLite now, PostgreSQL later by connection URL only; Alembic migrations). Source: project_context §5.4, §6.6, principle 5.
+SQLAlchemy models (SQLite now, PostgreSQL later by connection URL only). Phase 1 creates tables with `Base.metadata.create_all`; Alembic migrations are introduced in Phase 5 (ADR 0008). Source: project_context §5.4, §6.6, principle 5.
 
 ## ER diagram
 
@@ -43,6 +43,8 @@ erDiagram
         string id PK
         string experiment_id FK
         string status "queued running done failed"
+        float  progress "0..1, written by the job manager"
+        string stage "nullable: training evaluating computing_metrics saving"
         int    seed
         json   derived_seeds
         json   versions "python, libs, platform"
@@ -100,6 +102,7 @@ erDiagram
 
 ## Notes on entities
 
+- **RUN.progress / RUN.stage** are updated while the run is `running` (from the controller `progress` callback and the rollout episode count) and are what `GET /runs/{id}` reports; on `done` progress is 1.0 and stage null; on `failed` they keep the last values (`error_stage` names the failing stage). See `api.md`.
 - **Experiment** is the reusable definition (config), **Run** is one execution. Phase 1 creates exactly one Run per Experiment. A multi-seed benchmark creates one Run per seed under a shared Experiment (decided in ADR 0009), so aggregation needs only a `GROUP BY experiment_id`. This works because `config_hash` excludes `seed` and `name`, and `RUN.seed` is the authoritative seed of each run (`config.seed` is only the default).
 - **EpisodeTrajectory** is not a table (`EPISODE.n_steps` is `T`: states and observations have T+1 rows, actions and rewards T). The DB holds an `EPISODE` row with a pointer to the trajectory artifact (see below).
 - **METRIC_RESULT** has one row per (run, episode, metric_name), where a metric's companion values (`MetricValue.companions`, see `rcl/metrics/DEFINITIONS.md`) are stored as extra rows under their own `metric_name`, sharing the primary's `status`. Rows with `episode_id` NULL hold run-level scalars (e.g. final training return). `status` is `ok`, `censored` (a defined bound, value present) or `undefined` (`value` NULL, metric not defined for that episode) (see `rcl/metrics/DEFINITIONS.md`).
