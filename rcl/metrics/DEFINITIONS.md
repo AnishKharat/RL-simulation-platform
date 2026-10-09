@@ -14,7 +14,13 @@ An `EpisodeTrajectory` with `T = n_steps` steps at fixed step `dt` (s) has T+1 s
 
 Per-component difference `d_k = wrap(y(x_k) - y_ref)`, where `wrap` maps the components in `wrap_indices` to (-pi, pi] and is the identity for the others. Error `e_k = ||d_k||_2` (Euclidean norm; for one component, `|y - y_ref|`). Step size `S = ||wrap(y_ref - y(x_0))||_2`. Episode duration `T*dt` (not to be confused with `T_max`).
 
-A metric returns `(value, status, unit)`. `status` is `ok`, `censored` (value is a defined bound, e.g. never settled) or `undefined` (value is NaN).
+## MetricValue
+
+A metric returns one `MetricValue`: `name` (str, the metric's name in this file), `value` (float; NaN iff `status = undefined`), `unit` (str), `status` (`ok`, `censored`: value is a defined bound, e.g. never settled, or `undefined`: value is NaN) and `companions` (a mapping `name -> (value, unit)` of the secondary values this file lists with the metric, e.g. `max_abs_angle_error` for angle_error, `control_effort_rate` for control_effort, `settled` for settling_time; booleans are 0.0/1.0 with unit `bool`; empty when the metric defines none). Companions share the primary's `status`.
+
+**Storage (decision).** The type lives in `rcl.metrics` (not core; nothing in core consumes it). Persistence flattens it: one `METRIC_RESULT` row for the primary value and one extra row per companion, each with its own `metric_name` (the companion's name), `value`, `unit` and the primary's `status`. `METRIC_RESULT` therefore stays flat and queryable by name, with no JSON column.
+
+**Selection.** The metric list is chosen by the experiment manager, not by the user or the frontend. Phase 1 uses a fixed list: `return` (the episode reward sum) and `angle_error` (with its companion). Later phases extend this list in the manager; `GET /metrics` (docs/architecture/api.md) exposes the available metric names, units and companions.
 
 ## Phase 1 metrics
 
