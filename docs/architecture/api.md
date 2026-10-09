@@ -43,3 +43,9 @@ An **Experiment** is the reusable definition (config), a **Run** is one executio
 - **404** `{"detail": str}` for unknown ids.
 - **409** `{"detail": str}` for a trajectory of a run that is not `done`.
 - A failed run is not an HTTP error: `GET /runs/{id}` returns 200 with `status: "failed"` and `error`.
+
+## Frontend notes
+
+- The frontend builds the `POST /experiments` JSON from the schemas it fetched (`params_schema`, `metadata`) and plain HTTP only. It imports nothing from `rcl` (enforced by the `frontend` import-linter contract), so it cannot reuse `ExperimentConfig`; it assembles `{name, seed, environment: {id, params}, controller: {id, params}, evaluation: {episodes}, training?: {total_timesteps}}` itself. `training` is sent only when the selected controller's `metadata.requires_training` is true. Field names are fixed by this doc, not by schema discovery.
+- Form renderer: the registry restricts params models to a JSON-schema subset (`registry.md` section 3), so the renderer must handle exactly: scalar types (`string`, `number`, `integer`, `boolean`) with `minimum`/`maximum`/`exclusiveMinimum`/`exclusiveMaximum`; `enum` (Python `Enum` and `Literal`; `$ref` to a `$defs` entry that only holds an `enum` must be dereferenced); `anyOf` with a `null` branch (an optional field: render the inner widget plus a "none" toggle); arrays of numbers or strings, in both forms `items` (variable-length list) and `prefixItems` with `minItems`/`maxItems` (fixed-length tuple); and `default` (pre-fill each widget; send only values the user changed or all of them, both are valid because the server resolves defaults). `title` and `description` are labels and help text. Anything else is a registry bug, not a frontend case.
+- Server-side validation is authoritative: map each 422 item `loc` (after the `body` prefix) to the offending widget and show `msg` next to it.
