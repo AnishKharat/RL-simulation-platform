@@ -60,7 +60,7 @@ Dashed edges are special. The frontend edge is a network call, not an import. Th
 
 **core** holds only interfaces and types: `BaseEnvironment`, `BaseController`, `EnvSpec`, `TaskSpec`, `EpisodeTrajectory`, `TrainConfig`, the Pydantic experiment config. It has no heavy dependencies and no project imports, so every other module can depend on it safely.
 
-**registry** stores environment and controller entries behind `@register_environment` / `@register_controller`, discovers them by `pkgutil` package scanning, and returns metadata plus a Pydantic parameter schema per entry. It filters controller/environment compatibility from declared action-space types. Nothing else knows concrete names.
+**registry** stores environment and controller entries behind `@register_environment` / `@register_controller`, discovers them by `pkgutil` package scanning, and returns metadata plus a Pydantic parameter schema per entry. It filters controller/environment compatibility from declared metadata: action-space kind, linearization (`requires_linearization` vs `linearizable`) and action dimension (`action_dim` vs `max_action_dim`), ADR 0014. Nothing else knows concrete names.
 
 **environments** contain one file per robot (CartPole continuous/discrete, Pendulum balance/swing-up, later balance bot, arm). Each file implements `BaseEnvironment`, self-registers, and exposes `get_state`, `get_task_spec`, and optionally `get_linearization`. They import only `core` (plus the registry decorator, see above).
 

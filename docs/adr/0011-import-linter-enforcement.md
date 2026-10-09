@@ -31,7 +31,7 @@ Dependency rules are encoded in `pyproject.toml` under `[tool.importlinter]` (ro
 - Contracts reference packages by name, so new top-level packages must be added to the config.
 - The `metrics`, `analytics`, `persistence` packages share a layer, so they may not import each other
   (a `layers` rule with `|`); if one needs another, split or move shared code to `core`.
-- `project_context.md` section 4 wording still says env/controllers import only `core`; it must be updated.
+- Superseding note: `project_context.md` section 4 now states that environments/controllers import `core` and `registry` (ADR 0003). The "only `core`" wording in the root `CLAUDE.md` section 1 and the local `CLAUDE.md` files predates this and is to be aligned by the project owner; the contracts in `pyproject.toml` are authoritative.
 
 ## Alternatives
 - Convention plus code review: not reliable across agents.

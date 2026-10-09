@@ -31,7 +31,7 @@ being identical, and RL wrappers would duplicate the loop around `model.predict`
 ## Consequences
 - One evaluation loop for all controllers; the fair-comparison protocol is enforced in one place.
 - Controllers become simpler and need no `BaseEnvironment` knowledge except in `train`.
-- `project_context.md` section 5 still lists `evaluate` on `BaseController`; it needs the matching edit.
+- Superseding note: `project_context.md` section 5.2 was refreshed to the current interface (no `evaluate`); this ADR supersedes the `evaluate(env, n_episodes, seed)` method of the original design.
 
 ## Alternatives
 - Keep `evaluate` with a default implementation in the base class: invites per-controller overrides that diverge.

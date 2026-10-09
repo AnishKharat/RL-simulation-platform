@@ -61,3 +61,5 @@ Risks / follow-ups:
 - Worker exceptions must be caught at the job boundary (done) or they vanish into the Future.
 - Starlette 1.7 emits a deprecation warning: `TestClient` with httpx (suggests `httpx2`).
   Harmless now; watch when pinning versions.
+
+Registry discovery is covered by `spikes/registry_discovery` (the original spike) and, as regression tests, by `tests/registry/test_registry.py` (fixture packages, broken-module reporting, the `DISCOVERY_PACKAGES` constant).

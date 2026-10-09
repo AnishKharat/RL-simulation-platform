@@ -7,7 +7,7 @@
 A multi-seed benchmark needs many executions of the same definition. `docs/architecture/data-model.md` separates
 the reusable definition from one execution but leaves the multi-seed shape open ("decision to confirm").
 
-## Decision (proposed)
+## Decision
 - `EXPERIMENT` = reusable definition: `env_id`, `controller_id`, verbatim validated `config`, `config_hash`
   (sha256 of canonical JSON), optional `suite_id`.
 - `RUN` = one execution of an experiment: `status` (`queued | running | done | failed`), `seed`, `derived_seeds`,

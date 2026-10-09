@@ -72,8 +72,8 @@ rcl/
 ├── api/             # FastAPI backend (thin; delegates to experiments/analytics)
 ├── frontend/        # Streamlit (Phase 1–4) → Next.js (Phase 5)
 ├── perturbations/   # (Phase 4) disturbances, noise, wind, mass variation as env wrappers
-├── ros_adapter/     # (Phase 7) ROS2 bridge
-└── tests/
+└── ros_adapter/     # (Phase 7) ROS2 bridge
+tests/               # at the repository root (mirrors rcl/), not inside the package
 ```
 
 **Dependency rules**
@@ -87,7 +87,7 @@ rcl/
 
 ---
 
-## 5. Core Interfaces (proposed — refine in Phase 0)
+## 5. Core Interfaces (current as of architecture review 3; frozen at Phase 0 exit)
 
 ### 5.1 BaseEnvironment
 Follow the **Gymnasium API** so SB3 and the ecosystem work out of the box. Code: `rcl/core/environment.py`; naming and `get_env_spec`: ADR 0012.

@@ -1,6 +1,6 @@
 # 0008. SQLAlchemy with SQLite then Postgres; DB vs MLflow roles
 
-- Status: Accepted for SQLAlchemy/SQLite/artifacts; Alembic from Phase 5; MLflow role Proposed (Phase 2)
+- Status: Accepted for SQLAlchemy/SQLite/artifacts; Alembic from Phase 5; MLflow role deferred to Phase 2 (proposed)
 - Date: 2026-10-10
 
 ## Context
