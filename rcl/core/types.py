@@ -148,11 +148,15 @@ class ControllerMetadata(_Spec):
 class TaskSpec(_Spec):
     """What 'success' means for an environment, in true-state coordinates.
 
-    Success: |state - setpoint| <= tolerance element-wise for `success_hold_steps` consecutive
-    steps; the rollout then ends the episode with `terminated` and `truncated` both False
-    (success is not termination). `horizon_steps` is the time limit applied to every
-    controller (fair-comparison protocol, project_context 6.8). Failure semantics (e.g. pole
-    falls) are described in `failure_description` and signalled via `terminated`.
+    Success: |d_i| <= tolerance[i] for every state component i, for `success_hold_steps`
+    consecutive steps, where d_i = state[i] - setpoint[i], wrapped to (-pi, pi] for the indices
+    in `wrap_indices` (the same wrap the metrics use). A component that must not constrain
+    success gets a large FINITE tolerance (e.g. 1e9): `inf`/`nan` are rejected in `setpoint`
+    and `tolerance` so the spec stays JSON-safe; the rollout then ends the episode with
+    `terminated` and `truncated` both False (success is not termination).
+    `horizon_steps` is the time limit applied to every controller (fair-comparison protocol,
+    project_context 6.8). Failure semantics (e.g. pole falls) are
+    described in `failure_description` and signalled via `terminated`.
 
     Metric signal: the output is the vector y = state[error_state_indices] (at least one
     component) with reference `y_ref = setpoint[error_state_indices]` (a derived property, so
@@ -179,6 +183,8 @@ class TaskSpec(_Spec):
 
     @model_validator(mode="after")
     def _check_shapes(self) -> TaskSpec:
+        if not all(math.isfinite(v) for v in (*self.setpoint, *self.tolerance)):
+            raise ValueError("setpoint and tolerance must be finite (use a large value, not inf)")
         if len(self.tolerance) != len(self.setpoint):
             raise ValueError("tolerance and setpoint must have equal length")
         idx = self.error_state_indices

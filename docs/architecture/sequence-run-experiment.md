@@ -1,6 +1,6 @@
 # Sequence: Run Experiment
 
-Covers `POST /experiments` through result display. Design rules: project_context §5.4 (config), §6.8-6.9 (fairness, background jobs), principle 5 (reproducibility). Endpoint names follow Phase 1: `/experiments`, `/experiments/{id}`.
+Covers `POST /experiments` through result display. Design rules: project_context §5.4 (config), §6.8-6.9 (fairness, background jobs), principle 5 (reproducibility). Endpoints and schemas: `api.md` (status is polled on the run, `GET /runs/{run_id}`).
 
 ## Status states
 
@@ -38,7 +38,7 @@ sequenceDiagram
     API->>API: validate config (Pydantic)
     API->>DB: insert Experiment + Run(status=queued), config verbatim
     API->>W: submit(run_id)
-    API-->>FE: 202 {run_id, status: queued}
+    API-->>FE: 202 {experiment_id, run_ids, status: queued}
 
     W->>DB: status = running, started_at
     W->>EM: execute(run_id)
@@ -54,8 +54,9 @@ sequenceDiagram
     Note over EM,CTL: linear_model is in observation coordinates, None if the env offers none
 
     opt controller metadata requires_training
-        EM->>CTL: train(env_factory, TrainConfig(total_timesteps, seed, n_envs))
+        EM->>CTL: train(env_factory, TrainConfig(total_timesteps, seed, n_envs), progress)
         CTL->>ENV: env_factory() x n_envs, then reset(seed) / step(action) ...
+        CTL-->>EM: progress(done, total) periodically; EM writes RUN.progress; returns True to request stop
         CTL-->>EM: TrainResult (timesteps, curve)
         EM->>CTL: save(checkpoint_dir) (dir created by EM; controller fills it)
         EM->>DB: save training artifact refs
@@ -75,16 +76,16 @@ sequenceDiagram
     EM->>DB: save trajectories as artifacts, metric rows, status = done, finished_at
 
     loop poll every 1-2 s
-        FE->>API: GET /experiments/{id}
+        FE->>API: GET /runs/{run_id}
         API->>DB: read run + metrics
-        API-->>FE: {status, progress, metrics?}
+        API-->>FE: {status, stage, progress, metrics?}
     end
     FE-->>U: plots and metric table (status = done)
 ```
 
 ## Seeding
 
-- `config.seed` is the experiment's default root seed; the Run's own `seed` (authoritative, may override it for multi-seed benchmarks) is the one used. The manager derives independent seeds with `numpy.random.SeedSequence(seed).spawn(...)`: one for env construction, one for training, one for evaluation.
+- `config.seed` is the experiment's default root seed; the Run's own `seed` (authoritative, may override it for multi-seed benchmarks) is the one used. The manager derives independent seeds as `train, eval = (int(c.generate_state(1)[0]) for c in SeedSequence(seed).spawn(2))`, in that fixed order. There is no env-construction seed: environments are seeded only through `reset(seed=...)`.
 - Fairness: for the same run seed every controller gets identical evaluation seeds, and the training environment uses the same wrapper stack as the evaluation environment, except perturbations marked `apply_to: eval` (or `train`).
 - Evaluation episode `i` resets with `eval_seed + i` (or the i-th spawned child), so every controller in a benchmark sees identical initial states (§6.8).
 - No global RNG is used; seeds are passed explicitly to `reset`, `train`, and `evaluate`. The derived seeds are written to the Run row.
@@ -108,8 +109,8 @@ sequenceDiagram
     EM->>EM: close env, release resources
     EM->>DB: status = failed, error, stage, finished_at
     EM-->>W: raises, worker logs with logging and continues
-    FE->>API: GET /experiments/{id}
-    API-->>FE: {status: failed, error: "..."}
+    FE->>API: GET /runs/{run_id}
+    API-->>FE: {status: failed, error: {type, message, stage}}
 ```
 
 Rules:

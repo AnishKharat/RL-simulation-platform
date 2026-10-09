@@ -4,16 +4,23 @@ Each metric is a pure function `metric(traj: EpisodeTrajectory, task: TaskSpec) 
 
 ## Inputs and notation
 
-An `EpisodeTrajectory` with `T = n_steps` steps at fixed step `dt` (s) has T+1 state samples `x_0..x_T` (true state, `env.get_state()`; `x_0` is the post-reset state) at times `t_k = k*dt`, and T transitions: applied action `u_k` (physical units, after the environment's clipping; the raw `commanded_actions` are stored but never used by metrics; discrete actions are mapped to their applied value by the environment) and reward `r_k` for `k = 0..T-1`, where `u_k` is applied at `x_k` and produces `x_{k+1}`. Flags: `terminated`, `truncated`. **Indexing rule:** error, progress and settling quantities range over the state samples `k = 0..T`; sums over actuation or reward (`u_k`, `r_k`) range over `k < T` (k = 0..T-1). `TaskSpec` supplies:
+An `EpisodeTrajectory` with `T = n_steps` steps at fixed step `dt` (s) has T+1 state samples `x_0..x_T` (true state, `env.get_state()`; `x_0` is the post-reset state) at times `t_k = k*dt`, and T transitions: applied action `u_k` (physical units, after the environment's clipping; it is the reserved `info["applied_action"]` that every environment sets in `step()`, shape `action_shape`; the raw `commanded_actions` are stored but never used by metrics; discrete actions are mapped to their applied value by the environment) and reward `r_k` for `k = 0..T-1`, where `u_k` is applied at `x_k` and produces `x_{k+1}`. Flags: `terminated`, `truncated`. **Indexing rule:** error, progress and settling quantities range over the state samples `k = 0..T`; sums over actuation or reward (`u_k`, `r_k`) range over `k < T` (k = 0..T-1). `TaskSpec` supplies:
 
 - `y(x) = x[error_state_indices]`: the controlled output vector (at least one component, e.g. pole angle in rad) and `y_ref = setpoint[error_state_indices]`: its reference (derived, not stored separately).
 - `wrap_indices` (subset of `error_state_indices`): output components that are angles.
+- Success (used by the rollout, not a metric): `|wrap(x_k[i] - setpoint[i])| <= tolerance[i]` for all components, with `wrap` applied to `wrap_indices` exactly as for the error below. "Unbounded" tolerance is a large finite value (`inf`/`nan` are rejected so the spec is JSON-safe).
 - `T_max = horizon_steps * dt` (s; there is no separate time-limit field).
 - `step_floor` (`S_min`): smallest step size treated as a real step response.
 
 Per-component difference `d_k = wrap(y(x_k) - y_ref)`, where `wrap` maps the components in `wrap_indices` to (-pi, pi] and is the identity for the others. Error `e_k = ||d_k||_2` (Euclidean norm; for one component, `|y - y_ref|`). Step size `S = ||wrap(y_ref - y(x_0))||_2`. Episode duration `T*dt` (not to be confused with `T_max`).
 
-A metric returns `(value, status, unit)`. `status` is `ok`, `censored` (value is a defined bound, e.g. never settled) or `undefined` (value is NaN).
+## MetricValue
+
+A metric returns one `MetricValue`: `name` (str, the metric's name in this file), `value` (float; NaN iff `status = undefined`), `unit` (str), `status` (`ok`, `censored`: value is a defined bound, e.g. never settled, or `undefined`: value is NaN) and `companions` (a mapping `name -> (value, unit)` of the secondary values this file lists with the metric, e.g. `max_abs_angle_error` for angle_error, `control_effort_rate` for control_effort, `settled` for settling_time; booleans are 0.0/1.0 with unit `bool`; empty when the metric defines none). Companions share the primary's `status`.
+
+**Storage (decision).** The type lives in `rcl.metrics` (not core; nothing in core consumes it). Persistence flattens it: one `METRIC_RESULT` row for the primary value and one extra row per companion, each with its own `metric_name` (the companion's name), `value`, `unit` and the primary's `status`. `METRIC_RESULT` therefore stays flat and queryable by name, with no JSON column.
+
+**Selection.** The metric list is chosen by the experiment manager, not by the user or the frontend. Phase 1 uses a fixed list: `return` (the episode reward sum) and `angle_error` (with its companion). Later phases extend this list in the manager; `GET /metrics` (docs/architecture/api.md) exposes the available metric names, units and companions.
 
 ## Phase 1 metrics
 

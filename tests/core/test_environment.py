@@ -31,7 +31,7 @@ class _Dummy(BaseEnvironment):
         return np.zeros(1), {}
 
     def step(self, action: Any) -> Any:
-        return np.zeros(1), 0.0, False, False, {}
+        return np.zeros(1), 0.0, False, False, {"applied_action": np.asarray(action, float)}
 
     def get_env_spec(self) -> EnvSpec:
         return EnvSpec(
@@ -107,6 +107,12 @@ def test_env_wrapper_delegates_and_keeps_true_state() -> None:
     obs, *_ = w.step(np.zeros(1))
     assert obs[0] == 1.0  # perturbed observation
     assert w.get_state()[0] == 0.0  # true state untouched
+
+
+def test_env_wrapper_preserves_applied_action() -> None:
+    info = _Offset(_Dummy()).step(np.array([0.5]))[4]
+    assert info["applied_action"].shape == _Dummy().get_env_spec().action_shape
+    assert info["applied_action"][0] == 0.5
 
 
 def test_env_wrapper_rejects_plain_gym_env() -> None:

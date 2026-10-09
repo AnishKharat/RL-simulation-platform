@@ -60,7 +60,7 @@ Dashed edges are special. The frontend edge is a network call, not an import. Th
 
 **core** holds only interfaces and types: `BaseEnvironment`, `BaseController`, `EnvSpec`, `TaskSpec`, `EpisodeTrajectory`, `TrainConfig`, the Pydantic experiment config. It has no heavy dependencies and no project imports, so every other module can depend on it safely.
 
-**registry** stores environment and controller entries behind `@register_environment` / `@register_controller`, discovers them by `pkgutil` package scanning, and returns metadata plus a Pydantic parameter schema per entry. It filters controller/environment compatibility from declared action-space types. Nothing else knows concrete names.
+**registry** stores environment and controller entries behind `@register_environment` / `@register_controller`, discovers them by `pkgutil` package scanning, and returns metadata plus a Pydantic parameter schema per entry. It filters controller/environment compatibility from declared metadata: action-space kind, linearization (`requires_linearization` vs `linearizable`) and action dimension (`action_dim` vs `max_action_dim`), ADR 0014. Nothing else knows concrete names.
 
 **environments** contain one file per robot (CartPole continuous/discrete, Pendulum balance/swing-up, later balance bot, arm). Each file implements `BaseEnvironment`, self-registers, and exposes `get_state`, `get_task_spec`, and optionally `get_linearization`. They import only `core` (plus the registry decorator, see above).
 
@@ -74,7 +74,7 @@ Dashed edges are special. The frontend edge is a network call, not an import. Th
 
 **persistence** provides SQLAlchemy models and repositories (SQLite now, PostgreSQL later by config). It stores the experiment catalog, run status, metric results, and artifact references; see `data-model.md`.
 
-**api** is a thin FastAPI layer: registry listing, create/run/get experiment, and analytics queries. Long jobs are handed to a background worker and polled by status. It contains no domain logic.
+**api** is a thin FastAPI layer: registry listing, create/run/get experiment, and analytics queries (endpoints and schemas: `api.md`, ADR 0016). Long jobs are handed to a background worker and polled by status. It contains no domain logic.
 
 **frontend** renders dropdowns, parameter forms and plots purely from API/registry metadata, and has zero environment-specific logic. Streamlit now; Next.js in Phase 5 consuming the same API.
 
@@ -87,6 +87,10 @@ Dashed edges are special. The frontend edge is a network call, not an import. Th
 ## Planned: metrics catalog (Phase 1/2 note, not implemented)
 
 The frontend must not hardcode metric names, units or the choice of CI method. Plan: `analytics` exposes a catalog (`MetricInfo`: name, unit source, phase, CI method, higher-is-better) served by `GET /metrics`, built from the metrics package's own registry of definitions in `rcl/metrics/DEFINITIONS.md`. Decide the shape when the first metrics are implemented (Phase 1) and extend in Phase 2; no code before then.
+
+## Modularity proof (Phase 1)
+
+"Add a robot with one file" is tested, not asserted: the test creates a dummy `BaseEnvironment` subclass with `@register_environment` in a temporary package (`tmp_path` on `sys.path`), runs `discover(packages=[that_package])` on a fresh `Registry` (`use_registry`), and then drives the API (built by an app factory that takes the discovery package list, default `DISCOVERY_PACKAGES`): the id is listed by `GET /environments`, `POST /experiments` with a compatible controller is accepted, and the run completes. The dummy never lives in `rcl/environments`, so the shipped package list stays real. Same pattern for a dummy controller.
 
 ## Layering contract note
 

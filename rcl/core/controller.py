@@ -82,12 +82,22 @@ class BaseController(ABC):
     def predict(self, obs: np.ndarray, deterministic: bool = True) -> Action:
         """Map one observation to one action valid for the configured action space."""
 
-    def train(self, env_factory: Callable[[], BaseEnvironment], config: TrainConfig) -> TrainResult:
+    def train(
+        self,
+        env_factory: Callable[[], BaseEnvironment],
+        config: TrainConfig,
+        progress: Callable[[int, int], bool | None] | None = None,
+    ) -> TrainResult:
         """Learn within the `config` budget. Default (classical): no-op.
 
         `env_factory` builds a fresh environment (same wrapper stack as evaluation, ADR 0015)
         on each call; the controller calls it `config.n_envs` times (vectorised training) and
         owns/closes what it creates. Seeding comes from `config.seed`.
+
+        `progress(done, total)` is an optional callback the controller calls periodically with
+        timesteps done and the budget. If it returns True the controller must stop cooperatively
+        as soon as practical and return a `TrainResult` for what it learned so far (ADR 0015,
+        ADR 0007). Classical controllers never call it.
         """
         return TrainResult(timesteps=0)
 

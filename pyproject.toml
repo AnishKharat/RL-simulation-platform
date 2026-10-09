@@ -8,12 +8,12 @@ version = "0.0.1"
 description = "Robotics Control Lab: benchmark classical and RL controllers on simulated robots."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["pydantic>=2", "numpy", "gymnasium"]
+dependencies = ["pydantic>=2", "numpy", "gymnasium", "sqlalchemy"]
 
 [project.optional-dependencies]
 rl = ["stable-baselines3"]
-api = ["fastapi", "uvicorn", "sqlalchemy"]
-frontend = ["streamlit", "plotly"]
+api = ["fastapi", "uvicorn"]
+frontend = ["streamlit", "plotly", "httpx"]
 dev = ["pytest", "ruff", "mypy", "import-linter", "pre-commit", "httpx"]
 
 [tool.setuptools.packages.find]
@@ -31,6 +31,10 @@ python_version = "3.11"
 strict = true
 warn_unused_ignores = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["streamlit.*", "plotly.*", "torch.*", "stable_baselines3.*", "uvicorn.*", "mlflow.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -79,6 +83,7 @@ modules = ["rcl.environments", "rcl.controllers", "rcl.perturbations", "rcl.ros_
 name = "experiments import only core, registry, metrics, persistence"
 type = "forbidden"
 source_modules = ["rcl.experiments"]
+allow_indirect_imports = true  # experiments -> persistence -> ... chains are legal
 forbidden_modules = [
     "rcl.environments", "rcl.controllers", "rcl.perturbations", "rcl.ros_adapter",
     "rcl.analytics", "rcl.api", "rcl.frontend",
@@ -88,6 +93,7 @@ forbidden_modules = [
 name = "api imports only experiments, analytics, registry, persistence"
 type = "forbidden"
 source_modules = ["rcl.api"]
+allow_indirect_imports = true  # api -> experiments -> metrics is legal; only direct imports break
 forbidden_modules = [
     "rcl.environments", "rcl.controllers", "rcl.perturbations", "rcl.ros_adapter",
     "rcl.metrics", "rcl.frontend",

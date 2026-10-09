@@ -1,6 +1,6 @@
 # Data Model
 
-SQLAlchemy models (SQLite now, PostgreSQL later by connection URL only; Alembic migrations). Source: project_context §5.4, §6.6, principle 5.
+SQLAlchemy models (SQLite now, PostgreSQL later by connection URL only). Phase 1 creates tables with `Base.metadata.create_all`; Alembic migrations are introduced in Phase 5 (ADR 0008). Source: project_context §5.4, §6.6, principle 5.
 
 ## ER diagram
 
@@ -43,6 +43,8 @@ erDiagram
         string id PK
         string experiment_id FK
         string status "queued running done failed"
+        float  progress "0..1, written by the job manager"
+        string stage "nullable: training evaluating computing_metrics saving"
         int    seed
         json   derived_seeds
         json   versions "python, libs, platform"
@@ -100,9 +102,10 @@ erDiagram
 
 ## Notes on entities
 
+- **RUN.progress / RUN.stage** are updated while the run is `running` (from the controller `progress` callback and the rollout episode count) and are what `GET /runs/{id}` reports; on `done` progress is 1.0 and stage null; on `failed` they keep the last values (`error_stage` names the failing stage). See `api.md`.
 - **Experiment** is the reusable definition (config), **Run** is one execution. Phase 1 creates exactly one Run per Experiment. A multi-seed benchmark creates one Run per seed under a shared Experiment (decided in ADR 0009), so aggregation needs only a `GROUP BY experiment_id`. This works because `config_hash` excludes `seed` and `name`, and `RUN.seed` is the authoritative seed of each run (`config.seed` is only the default).
 - **EpisodeTrajectory** is not a table (`EPISODE.n_steps` is `T`: states and observations have T+1 rows, actions and rewards T). The DB holds an `EPISODE` row with a pointer to the trajectory artifact (see below).
-- **METRIC_RESULT** has one row per (run, episode, metric_name). Rows with `episode_id` NULL hold run-level scalars (e.g. final training return). `status` is `ok`, `censored` (a defined bound, value present) or `undefined` (`value` NULL, metric not defined for that episode) (see `rcl/metrics/DEFINITIONS.md`).
+- **METRIC_RESULT** has one row per (run, episode, metric_name), where a metric's companion values (`MetricValue.companions`, see `rcl/metrics/DEFINITIONS.md`) are stored as extra rows under their own `metric_name`, sharing the primary's `status`. Rows with `episode_id` NULL hold run-level scalars (e.g. final training return). `status` is `ok`, `censored` (a defined bound, value present) or `undefined` (`value` NULL, metric not defined for that episode) (see `rcl/metrics/DEFINITIONS.md`).
 - **RUN.task_spec** is the JSON snapshot of the `TaskSpec` in force (setpoint, tolerance, output indices, horizon), so metrics can be recomputed from stored trajectories even if the environment code later changes. **EPISODE.success** stores the env's success verdict per episode (success rate needs no trajectory load).
 - **AGGREGATE_RESULT** is a cache of cross-seed statistics (mean, CI, `n_censored`) that `analytics` can always recompute. Introduced in Phase 2; Phase 1 does not need it.
 - **BENCHMARK_SUITE / BENCHMARK_RUN** appear in Phase 2. The suite stores the grid; the same seeds, episode count, initial-state distribution and time limit apply to every cell (§6.8). Phase 4 robustness suites reuse this with a `perturbations` list inside `spec`.
@@ -114,7 +117,7 @@ A run is reproducible if `RUN` and its `EXPERIMENT` contain:
 | Field | Where | Content |
 |---|---|---|
 | seed | `RUN.seed` (authoritative); `config.seed` is the experiment default | root seed of this run |
-| derived seeds | `RUN.derived_seeds` | env / train / eval seeds from `SeedSequence` |
+| derived seeds | `RUN.derived_seeds` | `train` and `eval` seeds: `SeedSequence(seed).spawn(2)` children, each `int(child.generate_state(1)[0])`, in that order (no `env` seed; environments are seeded only by `reset(seed)`) |
 | config verbatim | `EXPERIMENT.config` | the validated Pydantic dump, stored as submitted, (params resolved, defaults filled), plus `config_hash` (sha256 of canonical JSON, `seed` and `name` excluded, see `ExperimentConfig.config_hash`) |
 | library versions | `RUN.versions` | python, numpy, gymnasium, stable-baselines3, torch, rcl, platform; from `importlib.metadata`; RL runs add `cuda`, `device`, `num_threads` (CPU-only determinism claim, ADR 0010) |
 | code version | `RUN.code_version` | git commit sha and whether the tree was dirty |

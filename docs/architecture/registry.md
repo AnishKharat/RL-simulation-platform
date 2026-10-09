@@ -30,7 +30,10 @@ class PID(BaseController): ...
 
 The decorator returns the class unchanged. Validation happens at decoration time (fail at import, not at run time):
 id matches `^[a-z][a-z0-9_]*$`; the class has the metadata attribute, of the right type (environments: `cls.env_metadata` must be an `EnvMetadata`; controllers: `cls.metadata` must be a `ControllerMetadata`, checked with `isinstance`, so gymnasium's own `metadata` dict can never be mistaken for it, ADR 0012); `params` (if given) is a `BaseModel` subclass with `extra="forbid"` (a typo in a param must fail, not be ignored).
+The registered class must also subclass the base of its kind (`BaseEnvironment` for environments, `BaseController` for controllers), so a decorated class that the experiment manager cannot use fails at import. `metadata.name` is NOT required to equal the id: the id is the stable registry key used in configs and URLs, `name` is the display label (it may contain spaces and capitals or be renamed without breaking stored configs).
 Violations raise `RegistryError` (a duplicate id raises `DuplicateIdError`).
+
+**Constructor contract.** The experiment manager builds an environment as `cls(**validated_params)` and a controller as `cls()` followed by `configure(env_spec, validated_params, linear_model)`; `validated_params` is `Entry.validate_params(raw)`, i.e. the params model dumped in JSON mode. Consequently (1) every environment's `__init__` must accept exactly the params model's fields as keyword arguments; (2) JSON has no tuples, so the params model (not the class) coerces JSON lists to the tuple/list types it declares (pydantic does this on validation) and the class receives what `model_dump(mode="json")` yields: lists. Environments must therefore tolerate list values for tuple-typed params (convert with `tuple(...)` if immutability matters); (3) no seed is passed to the constructor (seeds enter only through `reset(seed=...)`, ADR 0010).
 
 ## 3. Entry contents
 
@@ -51,8 +54,8 @@ forms from `params_schema` with no per-robot code. `Registry.entries(kind)` list
 
 Declared, never hardcoded (ADR 0014): `compatible_controllers(env_id)` returns controllers where the env's
 `action_space_kind` is in `supported_action_spaces`, `requires_linearization` implies the env is `linearizable`,
-and `EnvMetadata.action_dim <= max_action_dim` (when set); `compatible_environments(controller_id)` is the inverse. The API exposes
-both so the dropdown filters from registry data only.
+and `EnvMetadata.action_dim <= max_action_dim` (when set); `compatible_environments(controller_id)` is the inverse, and `is_compatible(controller_id, env_id)` is the single-pair check used to reject a bad pair before queuing. The API exposes
+the filters so the dropdown is built from registry data only.
 
 ## 5. Discovery
 
@@ -83,5 +86,5 @@ the previous one, so nothing leaks between tests. Library code that needs a regi
 ## 8. How the API lists entries
 
 `GET /environments`, `GET /controllers` return `[entry.info() ...]`;
-`GET /environments/{id}/compatible-controllers` uses the filter. The API imports `rcl.registry` only, calls
+`GET /controllers/compatible?env_id=` uses the filter (full surface: `api.md`). The API imports `rcl.registry` only, calls
 `discover()` in its startup hook, and never names a concrete robot or controller.

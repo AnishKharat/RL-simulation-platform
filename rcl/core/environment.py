@@ -23,6 +23,11 @@ class BaseEnvironment(gym.Env[Any, Any], ABC):
       actions => identical trajectory, claimed for the same platform and library versions on
       CPU only (GPU and multi-thread numerics are out of scope, ADR 0010). Simulation, not
       wall-clock, drives time (`dt` fixed).
+    * Reserved info key: `step()` MUST set `info["applied_action"]`, an ndarray of shape
+      `EnvSpec.action_shape` (float64) holding the action actually applied to the plant after
+      the environment's own mapping and clipping (discrete actions mapped to their applied
+      value). The rollout records it as the trajectory's applied actions; metrics read only
+      this, never the commanded action (ADR 0013). `reset()` need not set it.
     * `terminated` = task FAILURE only (e.g. the pole fell); success is NOT termination: the
       episode otherwise runs to the horizon or until the rollout sees `success_hold_steps`
       consecutive in-tolerance steps (both flags False then). `truncated` = the
@@ -69,6 +74,9 @@ class EnvWrapper(BaseEnvironment, gym.Wrapper[Any, Any, Any, Any]):
     * Wraps a `BaseEnvironment` and is itself a `BaseEnvironment`, so controllers, the
       rollout and metrics cannot tell it apart. `reset`/`step`/`render`/`close` follow
       `gymnasium.Wrapper` (delegation); subclasses override `step`/`reset` to perturb.
+    * `step` must preserve the wrapped environment's `info["applied_action"]` (default
+      delegation does); a wrapper that perturbs actions must report in it what finally reached
+      the plant, not the commanded value.
     * `get_state()` returns the TRUE, UNPERTURBED state of the wrapped environment (sensor
       noise and disturbances act on observations/actions only), so metrics stay comparable
       across perturbation levels.

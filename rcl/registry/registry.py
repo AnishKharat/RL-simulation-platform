@@ -17,6 +17,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ValidationError
 
+from rcl.core.controller import BaseController
+from rcl.core.environment import BaseEnvironment
 from rcl.core.types import ControllerMetadata, EnvMetadata
 
 Kind = Literal["environment", "controller"]
@@ -25,6 +27,7 @@ _META: dict[str, tuple[str, type[BaseModel]]] = {
     "environment": ("env_metadata", EnvMetadata),
     "controller": ("metadata", ControllerMetadata),
 }
+_BASE: dict[str, type] = {"environment": BaseEnvironment, "controller": BaseController}
 _ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
@@ -104,6 +107,11 @@ class Registry:
         """Add an entry; raises RegistryError (bad entry) or DuplicateIdError."""
         if not _ID_RE.match(id):
             raise RegistryError(f"invalid {kind} id {id!r}: must match {_ID_RE.pattern}")
+        if not (isinstance(cls, type) and issubclass(cls, _BASE[kind])):
+            raise RegistryError(
+                f"{getattr(cls, '__qualname__', cls)!r} must subclass {_BASE[kind].__name__} "
+                f"to be registered as an {kind}"
+            )
         attr, meta_type = _META[kind]
         meta = getattr(cls, attr, None)
         if not isinstance(meta, meta_type):
@@ -145,6 +153,15 @@ class Registry:
         """Controllers compatible with the env (ADR 0014: action kind, linearization, dim)."""
         env_meta = self.get("environment", env_id).metadata
         return [c for c in self.entries("controller") if _supports(c.metadata, env_meta)]
+
+    def is_compatible(self, controller_id: str, env_id: str) -> bool:
+        """True if the declared metadata of the pair is compatible (ADR 0014). Raises
+        UnknownIdError for an unregistered id; the experiment manager and the API use this
+        to reject an incompatible pair before any work starts."""
+        return _supports(
+            self.get("controller", controller_id).metadata,
+            self.get("environment", env_id).metadata,
+        )
 
     def compatible_environments(self, controller_id: str) -> list[Entry]:
         """Inverse of :meth:`compatible_controllers`."""

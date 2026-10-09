@@ -1,6 +1,6 @@
 # 0008. SQLAlchemy with SQLite then Postgres; DB vs MLflow roles
 
-- Status: Accepted for SQLAlchemy/SQLite/Alembic/artifacts; Proposed for the MLflow role (Phase 2)
+- Status: Accepted for SQLAlchemy/SQLite/artifacts; Alembic from Phase 5; MLflow role deferred to Phase 2 (proposed)
 - Date: 2026-10-10
 
 ## Context
@@ -9,7 +9,9 @@ locally, and movable to a server database. Training curves and checkpoints are l
 better. See `docs/architecture/data-model.md`.
 
 ## Decision
-- SQLAlchemy models with Alembic migrations in `rcl.persistence`. SQLite for development; PostgreSQL later by
+- SQLAlchemy models in `rcl.persistence`. Phase 1 creates the schema with `Base.metadata.create_all` (no migration
+  tooling yet: the DB is a disposable dev catalog); Alembic migrations are introduced in Phase 5, together with
+  PostgreSQL, when schemas must survive upgrades. SQLite for development; PostgreSQL later by
   changing the connection URL only (avoid dialect-specific types; JSON columns stay portable).
 - The database is the source of truth for catalog, status, verbatim config, seeds, versions, per-episode and
   per-run metric values, benchmarks and aggregates. It must answer every comparison query without MLflow running.
