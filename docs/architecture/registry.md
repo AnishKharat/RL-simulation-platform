@@ -30,7 +30,7 @@ class PID(BaseController): ...
 ```
 
 The decorator returns the class unchanged. Validation happens at decoration time (fail at import, not at run time):
-id matches `^[a-z][a-z0-9_]*$`; the class has the metadata attribute, of the right type (environments: `cls.env_metadata` must be an `EnvMetadata`; controllers: `cls.metadata` must be a `ControllerMetadata`, checked with `isinstance`, so gymnasium's own `metadata` dict can never be mistaken for it, ADR 0012); `params` (if given) is a `BaseModel` subclass.
+id matches `^[a-z][a-z0-9_]*$`; the class has the metadata attribute, of the right type (environments: `cls.env_metadata` must be an `EnvMetadata`; controllers: `cls.metadata` must be a `ControllerMetadata`, checked with `isinstance`, so gymnasium's own `metadata` dict can never be mistaken for it, ADR 0012); `params` (if given) is a `BaseModel` subclass with `extra="forbid"` (a typo in a param must fail, not be ignored).
 Violations raise `RegistryError`.
 
 ## 3. Entry contents
@@ -38,7 +38,9 @@ Violations raise `RegistryError`.
 `Entry(kind, id, cls, metadata, params_model)`; `metadata` is `cls.env_metadata` for environments and `cls.metadata` for controllers (core's `EnvMetadata` /
 `ControllerMetadata`). `requires_training` is part of `ControllerMetadata` (no class attribute), so it appears in `info()["metadata"]`. Training hyperparameters live in the controller's own `params` model (one schema per controller); `TrainConfig` / `TrainingSection` carry only the budget (`total_timesteps`) and seed. `Entry.info()` returns the API-facing dict:
 `{id, kind, metadata: <model_dump>, params_schema: params_model.model_json_schema() or {}}` so the frontend renders
-forms from `params_schema` with no per-robot code. `Registry.entries(kind)` lists; `Entry.validate_params(raw)` validates through the model.
+forms from `params_schema` with no per-robot code. `Registry.entries(kind)` lists; `Entry.validate_params(raw)` validates through the model and returns the RESOLVED params (defaults filled, `model_dump(mode="json")`); those, not the raw input, are what the experiment manager stores and hashes. An entry without a params model accepts only `{}`.
+
+**Single source of truth for parameters:** `EnvMetadata` and `ControllerMetadata` carry no `params_schema` / `default_params`. The JSON schema and defaults come only from the Pydantic params model passed to the decorator.
 
 **From core:** the registry imports `EnvMetadata` / `ControllerMetadata` from `rcl.core.types` (allowed edge registry -> core) and reads `action_space_kind` (env) and `supported_action_spaces` (controller) from them directly.
 

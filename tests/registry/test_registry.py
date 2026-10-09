@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from rcl.core.controller import Action, BaseController
 from rcl.core.environment import BaseEnvironment
@@ -31,7 +31,9 @@ from rcl.registry import (
 
 
 class Params(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     kp: float = 1.0
+    gains: tuple[float, float] = (0.0, 1.0)
 
 
 def _env_meta(kind: ActionSpaceKind = ActionSpaceKind.CONTINUOUS) -> EnvMetadata:
@@ -77,7 +79,11 @@ def test_register_lookup_and_info(reg: Registry) -> None:
     assert entry.info()["metadata"]["requires_training"] is False
     info = entry.info()
     assert info["params_schema"]["properties"]["kp"]["default"] == 1.0
-    assert entry.validate_params({"kp": 2}) == {"kp": 2.0}
+    assert "params_schema" not in info["metadata"]  # schema comes from the params model only
+    # resolved params: defaults filled, JSON-safe (tuple -> list)
+    assert entry.validate_params({"kp": 2}) == {"kp": 2.0, "gains": [0.0, 1.0]}
+    with pytest.raises(ValidationError):
+        entry.validate_params({"kd": 1})
     assert get_registry() is reg
 
 
@@ -162,6 +168,22 @@ def test_real_base_controller_subclass_registers_via_metadata(reg: Registry) -> 
         def load(self, path: Path) -> None: ...
 
     assert reg.get("controller", "realc").metadata is RealC.metadata
+
+
+def test_params_model_must_forbid_extra(reg: Registry) -> None:
+    class Loose(BaseModel):
+        kp: float = 1.0
+
+    with pytest.raises(RegistryError, match="forbid"):
+        register_controller("loose", params=Loose)(_ctl_cls())
+
+
+def test_no_params_model_accepts_only_empty(reg: Registry) -> None:
+    register_environment("e")(_env_cls())
+    entry = reg.get("environment", "e")
+    assert entry.validate_params(None) == {} and entry.info()["params_schema"] == {}
+    with pytest.raises(ValueError):
+        entry.validate_params({"x": 1})
 
 
 def test_unknown_id(reg: Registry) -> None:

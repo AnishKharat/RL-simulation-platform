@@ -58,10 +58,14 @@ class Entry:
         return {"id": self.id, "kind": self.kind, "metadata": meta, "params_schema": schema}
 
     def validate_params(self, raw: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Validate ``raw`` against the param model (defaults filled in); {} if none declared."""
+        """Validate ``raw`` against the param model and return the RESOLVED params: defaults
+        filled, JSON-safe (``model_dump(mode="json")``). These are what gets stored/hashed.
+        Without a param model only an empty dict is accepted."""
         if self.params_model is None:
-            return dict(raw or {})
-        return self.params_model(**(raw or {})).model_dump()
+            if raw:
+                raise ValueError(f"{self.kind} {self.id!r} takes no params, got {sorted(raw)}")
+            return {}
+        return self.params_model(**(raw or {})).model_dump(mode="json")
 
 
 class Registry:
@@ -85,6 +89,11 @@ class Registry:
             )
         if params is not None and not (isinstance(params, type) and issubclass(params, BaseModel)):
             raise RegistryError(f"params for {id!r} must be a pydantic BaseModel subclass")
+        if params is not None and params.model_config.get("extra") != "forbid":
+            raise RegistryError(
+                f"params model {params.__qualname__} for {id!r} must set extra='forbid' "
+                "(typos in params must fail, not be ignored)"
+            )
         existing = self._entries[kind].get(id)
         if existing is not None:
             # Same class re-imported (importlib.reload, module imported under two names)

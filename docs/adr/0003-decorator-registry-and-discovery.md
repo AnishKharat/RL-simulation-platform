@@ -15,7 +15,7 @@ Full design: `docs/architecture/registry.md`.
 - `discover()` walks `rcl.environments` and `rcl.controllers` with `pkgutil.walk_packages`, importing every module
   so decorators run. An import failure raises `RegistryError` naming the module (loud, not silently missing).
   Called once at API/experiment-manager startup, never on registry import.
-- `Entry.info()` returns `{id, kind, metadata, params_schema}` (JSON schema from the params model) so the
+- `Entry.info()` returns `{id, kind, metadata, params_schema}` (JSON schema derived from the params model, the single source of truth; metadata carries no schema; params models must set `extra="forbid"`; `validate_params` returns resolved JSON-safe params) so the
   frontend renders forms generically.
 - Import rule, option (a): `environments|controllers -> registry -> core`. Registry imports only `core` and loads
   modules by name via `importlib`, so there is no static cycle. Rejected (b): moving decorator and store into `core`.

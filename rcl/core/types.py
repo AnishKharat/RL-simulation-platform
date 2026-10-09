@@ -9,7 +9,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -34,8 +33,10 @@ class _Spec(BaseModel):
 class EnvMetadata(_Spec):
     """Static, class-level description of an environment (drives registry/frontend forms).
 
-    Contract: available without instantiating the environment. `params_schema` is the JSON
-    schema of the constructor parameters; `default_params` must validate against it.
+    Contract: available without instantiating the environment. It carries no parameter
+    schema: the single source of truth is the Pydantic params model given to
+    `@register_environment(..., params=Model)`; the registry derives the JSON schema and the
+    defaults from it.
     """
 
     name: str
@@ -43,8 +44,6 @@ class EnvMetadata(_Spec):
     dof: int = Field(ge=1)
     action_space_kind: ActionSpaceKind
     physics_backend: str
-    default_params: dict[str, Any] = Field(default_factory=dict)
-    params_schema: dict[str, Any] = Field(default_factory=dict)
 
 
 class EnvSpec(_Spec):
@@ -98,7 +97,6 @@ class ControllerMetadata(_Spec):
     family: ControllerFamily
     supported_action_spaces: tuple[ActionSpaceKind, ...] = Field(min_length=1)
     requires_training: bool
-    params_schema: dict[str, Any] = Field(default_factory=dict)
 
 
 class TaskSpec(_Spec):

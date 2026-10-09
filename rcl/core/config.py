@@ -17,7 +17,9 @@ class _Strict(BaseModel):
 
 class ComponentConfig(_Strict):
     """Reference to a registry entry: `id` is a registry key, `params` are validated later
-    against that entry's parameter schema (core cannot know it)."""
+    against that entry's params model (core cannot know it). The experiment manager replaces
+    `params` with the RESOLVED params (defaults filled, `Entry.validate_params`) before the
+    config is hashed and stored, so a stored config never depends on today's defaults."""
 
     id: str = Field(min_length=1)
     params: dict[str, Any] = Field(default_factory=dict)
