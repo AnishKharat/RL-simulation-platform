@@ -16,6 +16,10 @@ being identical, and RL wrappers would duplicate the loop around `model.predict`
   until `terminated` (failure), `truncated` (horizon) or success (`success_hold_steps`; both flags False); states are recorded from `env.get_state()` (true state); `success` is judged
   with `env.get_task_spec()`. It is documented in `docs/architecture/sequence-run-experiment.md`; implementation
   is a Phase 1 task (not implemented in Phase 0).
+- Applied actions: every environment sets the reserved `info["applied_action"]` (ndarray, `EnvSpec.action_shape`) in
+  `step()`: the action actually applied after the environment's mapping and clipping. The rollout records it as the
+  trajectory's applied actions (the ones metrics use) next to the raw `commanded_actions`. `EnvWrapper` preserves it
+  (a wrapper that perturbs actions reports what reached the plant).
 
 ## Consequences
 - One evaluation loop for all controllers; the fair-comparison protocol is enforced in one place.
