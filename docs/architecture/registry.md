@@ -61,7 +61,7 @@ Called once by the API/experiment manager at startup, never from the registry im
 
 | Situation | Behaviour |
 |---|---|
-| Duplicate id within a kind | `DuplicateIdError` at decoration (same class object re-registered is a no-op) |
+| Duplicate id within a kind | `DuplicateIdError` at decoration (the same class re-registered, compared by `__module__` + `__qualname__` so a reloaded module is fine, is a no-op) |
 | Same id across kinds | allowed (kinds are separate namespaces) |
 | Bad id / missing metadata / non-Pydantic params | `RegistryError` at decoration |
 | Unknown id on lookup | `UnknownIdError` (a `KeyError` subclass) listing known ids |

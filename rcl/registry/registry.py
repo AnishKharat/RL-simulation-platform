@@ -87,7 +87,9 @@ class Registry:
             raise RegistryError(f"params for {id!r} must be a pydantic BaseModel subclass")
         existing = self._entries[kind].get(id)
         if existing is not None:
-            if existing.cls is cls:
+            # Same class re-imported (importlib.reload, module imported under two names)
+            # yields a new class object, so identity is the wrong test.
+            if _class_key(existing.cls) == _class_key(cls):
                 return
             raise DuplicateIdError(
                 f"{kind} {id!r} already registered by {existing.cls.__qualname__}"
@@ -115,6 +117,10 @@ class Registry:
         return [
             e for e in self.entries("environment") if _supports(meta, e.metadata.action_space_kind)
         ]
+
+
+def _class_key(cls: type) -> tuple[str, str]:
+    return cls.__module__, cls.__qualname__
 
 
 def _supports(controller_meta: Any, kind: str) -> bool:

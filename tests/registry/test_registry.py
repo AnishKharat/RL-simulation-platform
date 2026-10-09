@@ -50,6 +50,12 @@ def _env_cls(kind: ActionSpaceKind = ActionSpaceKind.CONTINUOUS) -> type:
     return type("E", (), {"env_metadata": _env_meta(kind)})
 
 
+def _named_env(qualname: str) -> type:
+    c = _env_cls()
+    c.__module__, c.__qualname__ = "fx_mod", qualname
+    return c
+
+
 def _ctl_cls(*kinds: ActionSpaceKind) -> type:
     return type("C", (), {"metadata": _ctl_meta(*kinds)})
 
@@ -74,9 +80,9 @@ def test_register_lookup_and_info(reg: Registry) -> None:
 
 
 def test_duplicate_id(reg: Registry) -> None:
-    register_environment("e")(_env_cls())
+    register_environment("e")(_named_env("A"))
     with pytest.raises(DuplicateIdError):
-        register_environment("e")(_env_cls())
+        register_environment("e")(_named_env("B"))
     register_controller("e")(_ctl_cls())  # separate namespace
 
 
@@ -85,6 +91,14 @@ def test_same_class_twice_is_noop(reg: Registry) -> None:
     register_environment("e")(c)
     register_environment("e")(c)
     assert len(reg.entries("environment")) == 1
+
+
+def test_reloaded_class_is_noop_but_different_class_conflicts(reg: Registry) -> None:
+    register_environment("e")(_named_env("E"))
+    register_environment("e")(_named_env("E"))  # new class object, same module+qualname
+    assert len(reg.entries("environment")) == 1
+    with pytest.raises(DuplicateIdError):
+        register_environment("e")(_named_env("Other"))
 
 
 @pytest.mark.parametrize("bad_id", ["Bad", "1x", "a-b", ""])
