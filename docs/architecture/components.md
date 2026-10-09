@@ -88,6 +88,10 @@ Dashed edges are special. The frontend edge is a network call, not an import. Th
 
 The frontend must not hardcode metric names, units or the choice of CI method. Plan: `analytics` exposes a catalog (`MetricInfo`: name, unit source, phase, CI method, higher-is-better) served by `GET /metrics`, built from the metrics package's own registry of definitions in `rcl/metrics/DEFINITIONS.md`. Decide the shape when the first metrics are implemented (Phase 1) and extend in Phase 2; no code before then.
 
+## Modularity proof (Phase 1)
+
+"Add a robot with one file" is tested, not asserted: the test creates a dummy `BaseEnvironment` subclass with `@register_environment` in a temporary package (`tmp_path` on `sys.path`), runs `discover(packages=[that_package])` on a fresh `Registry` (`use_registry`), and then drives the API (built by an app factory that takes the discovery package list, default `DISCOVERY_PACKAGES`): the id is listed by `GET /environments`, `POST /experiments` with a compatible controller is accepted, and the run completes. The dummy never lives in `rcl/environments`, so the shipped package list stays real. Same pattern for a dummy controller.
+
 ## Layering contract note
 
 The plugin tier is `environments | controllers | perturbations | ros_adapter` (mutually independent; `perturbations` and `ros_adapter` exist as empty packages so import-linter can verify them before Phase 4 / 7).
