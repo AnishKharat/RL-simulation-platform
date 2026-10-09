@@ -20,6 +20,10 @@ Dependency rules are encoded in `pyproject.toml` under `[tool.importlinter]` (ro
 - `frontend` imports no other `rcl` package (HTTP only).
 - A `layers` contract: frontend > api > experiments > (analytics | persistence | metrics) >
   (environments | controllers | perturbations | ros_adapter) > registry > core, downward only.
+- `forbidden` contracts for `experiments` and `api` set `allow_indirect_imports = true`: by default they also fail on
+  chains, and `api -> experiments -> metrics` is legitimate (the layering is enforced by the `layers` contract).
+  Verified with scratch modules: a direct `rcl.api -> rcl.metrics` or `rcl.experiments -> rcl.analytics` import still
+  breaks the build, the chain does not.
 - `lint-imports` runs with tests and ruff before every commit.
 
 ## Consequences

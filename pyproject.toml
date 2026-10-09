@@ -79,6 +79,7 @@ modules = ["rcl.environments", "rcl.controllers", "rcl.perturbations", "rcl.ros_
 name = "experiments import only core, registry, metrics, persistence"
 type = "forbidden"
 source_modules = ["rcl.experiments"]
+allow_indirect_imports = true  # experiments -> persistence -> ... chains are legal
 forbidden_modules = [
     "rcl.environments", "rcl.controllers", "rcl.perturbations", "rcl.ros_adapter",
     "rcl.analytics", "rcl.api", "rcl.frontend",
@@ -88,6 +89,7 @@ forbidden_modules = [
 name = "api imports only experiments, analytics, registry, persistence"
 type = "forbidden"
 source_modules = ["rcl.api"]
+allow_indirect_imports = true  # api -> experiments -> metrics is legal; only direct imports break
 forbidden_modules = [
     "rcl.environments", "rcl.controllers", "rcl.perturbations", "rcl.ros_adapter",
     "rcl.metrics", "rcl.frontend",
