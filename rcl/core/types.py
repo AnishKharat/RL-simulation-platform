@@ -106,21 +106,35 @@ class TaskSpec(_Spec):
     controller (fair-comparison protocol, project_context 6.8). Failure semantics (e.g. pole
     falls) are described in `failure_description` and signalled via `terminated`.
 
-    Metric signal: the scalar output is y = state[error_state_index], its reference is `y_ref`
-    (the 2% settling band is |y - y_ref| <= 0.02 * max(|y_ref - y(0)|, step_floor); `step_floor`
-    is the minimum step size used when the commanded step is ~0). `time_limit_s` equals
-    horizon_steps * dt of the environment.
+    Metric signal: the scalar output is y = state[error_state_index] with reference
+    `y_ref = setpoint[error_state_index]` (a derived property, so it cannot disagree with
+    `setpoint`). The 2% settling band is |y - y_ref| <= 0.02 * max(|y_ref - y(0)|, step_floor);
+    `step_floor` is the minimum step size used when the commanded step is ~0. `angle_wrap`
+    is True when y is an angle (errors are wrapped to (-pi, pi]). The episode time limit is
+    T_max = horizon_steps * EnvSpec.dt (there is no separate time-limit field).
     """
 
     setpoint: tuple[float, ...]
     tolerance: tuple[float, ...]
     error_state_index: int = Field(ge=0)
-    y_ref: float
     step_floor: float = Field(gt=0)
-    time_limit_s: float = Field(gt=0)
     horizon_steps: int = Field(gt=0)
     success_hold_steps: int = Field(default=1, gt=0)
+    angle_wrap: bool = False
     failure_description: str = ""
+
+    @model_validator(mode="after")
+    def _check_shapes(self) -> TaskSpec:
+        if len(self.tolerance) != len(self.setpoint):
+            raise ValueError("tolerance and setpoint must have equal length")
+        if self.error_state_index >= len(self.setpoint):
+            raise ValueError("error_state_index out of range for setpoint")
+        return self
+
+    @property
+    def y_ref(self) -> float:
+        """Reference of the scalar output: `setpoint[error_state_index]`."""
+        return self.setpoint[self.error_state_index]
 
 
 class TrainConfig(_Spec):

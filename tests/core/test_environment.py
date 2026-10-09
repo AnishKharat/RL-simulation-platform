@@ -46,9 +46,7 @@ class _Dummy(BaseEnvironment):
             setpoint=(0.0,),
             tolerance=(0.1,),
             error_state_index=0,
-            y_ref=0.0,
             step_floor=0.05,
-            time_limit_s=0.5,
             horizon_steps=5,
         )
 

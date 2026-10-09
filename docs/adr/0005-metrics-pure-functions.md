@@ -32,3 +32,6 @@ run was produced. Full definitions: `rcl/metrics/DEFINITIONS.md`.
 - Metrics computed online inside the env/runner: not recomputable, couples definitions to execution.
 - Dropping non-settled episodes: survivorship bias.
 - Episode-level CIs: treat one policy's episodes as independent training samples.
+
+## Revisions (architecture review 1)
+- `TaskSpec`: `time_limit_s` removed (T_max = `horizon_steps * dt`); `y_ref` is now the derived property `setpoint[error_state_index]` instead of a stored field; `angle_wrap: bool = False` added; tolerance/setpoint lengths and index range are validated.

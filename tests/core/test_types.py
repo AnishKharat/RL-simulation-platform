@@ -92,9 +92,7 @@ def test_metadata_and_specs_round_trip() -> None:
         setpoint=(0.0,),
         tolerance=(0.1,),
         error_state_index=0,
-        y_ref=0.0,
         step_floor=0.05,
-        time_limit_s=0.2,
         horizon_steps=10,
     )
     assert TaskSpec.model_validate_json(ts.model_dump_json()) == ts
@@ -134,3 +132,15 @@ def test_env_spec_valid_continuous() -> None:
     EnvSpec(
         **_ES, action_space_kind="continuous", action_shape=(1,), action_low=(-1,), action_high=(1,)
     )
+
+
+def test_task_spec_derived_y_ref_and_validation() -> None:
+    kw: dict[str, Any] = {"tolerance": (0.1, 0.1), "step_floor": 0.05, "horizon_steps": 5}
+    ts = TaskSpec(setpoint=(0.0, 2.5), error_state_index=1, **kw)
+    assert ts.y_ref == 2.5 and ts.angle_wrap is False
+    with pytest.raises(ValidationError):
+        TaskSpec(setpoint=(0.0, 2.5), error_state_index=2, **kw)
+    with pytest.raises(ValidationError):
+        TaskSpec(setpoint=(0.0,), error_state_index=0, **kw)
+    with pytest.raises(ValidationError):
+        TaskSpec(setpoint=(0.0, 1.0), error_state_index=0, y_ref=0.0, **kw)
