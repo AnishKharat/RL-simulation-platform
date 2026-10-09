@@ -1,0 +1,173 @@
+"""Shared spec/data types. Imports nothing from the project (see rcl/core/CLAUDE.md).
+
+Declarative specs are frozen Pydantic models (JSON-serialisable, safe for registry/API use).
+Array-carrying types are frozen dataclasses that validate their shape invariants on creation.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
+
+import numpy as np
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class ActionSpaceKind(StrEnum):
+    """Kind of action space an environment exposes / a controller supports."""
+
+    DISCRETE = "discrete"
+    CONTINUOUS = "continuous"
+
+
+class ControllerFamily(StrEnum):
+    CLASSICAL = "classical"
+    RL = "rl"
+
+
+class _Spec(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class EnvMetadata(_Spec):
+    """Static, class-level description of an environment (drives registry/frontend forms).
+
+    Contract: available without instantiating the environment. `params_schema` is the JSON
+    schema of the constructor parameters; `default_params` must validate against it.
+    """
+
+    name: str
+    description: str = ""
+    dof: int = Field(ge=1)
+    action_space_kind: ActionSpaceKind
+    physics_backend: str
+    default_params: dict[str, Any] = Field(default_factory=dict)
+    params_schema: dict[str, Any] = Field(default_factory=dict)
+
+
+class EnvSpec(_Spec):
+    """Runtime description of one environment instance, handed to `BaseController.configure`.
+
+    Contract: shapes/bounds are those of the instance's gymnasium spaces; `dt` is the control
+    period in seconds. `n_actions` is set iff `action_space_kind` is DISCRETE;
+    `action_low/high` are set iff CONTINUOUS.
+    """
+
+    env_id: str
+    action_space_kind: ActionSpaceKind
+    obs_shape: tuple[int, ...]
+    state_dim: int = Field(ge=1)
+    dt: float = Field(gt=0)
+    action_shape: tuple[int, ...] = ()
+    n_actions: int | None = Field(default=None, ge=2)
+    action_low: tuple[float, ...] | None = None
+    action_high: tuple[float, ...] | None = None
+
+
+class ControllerMetadata(_Spec):
+    """Static description of a controller. `supported_action_spaces` is declared, never
+    hardcoded elsewhere: the registry uses it to filter compatible environments."""
+
+    name: str
+    description: str = ""
+    family: ControllerFamily
+    supported_action_spaces: tuple[ActionSpaceKind, ...] = Field(min_length=1)
+    params_schema: dict[str, Any] = Field(default_factory=dict)
+
+
+class TaskSpec(_Spec):
+    """What 'success' means for an environment, in true-state coordinates.
+
+    Success: |state - setpoint| <= tolerance element-wise for `success_hold_steps` consecutive
+    steps before the episode ends. `horizon_steps` is the time limit applied to every
+    controller (fair-comparison protocol, project_context 6.8). Failure semantics (e.g. pole
+    falls) are described in `failure_description` and signalled via `terminated`.
+    """
+
+    setpoint: tuple[float, ...]
+    tolerance: tuple[float, ...]
+    horizon_steps: int = Field(gt=0)
+    success_hold_steps: int = Field(default=1, gt=0)
+    failure_description: str = ""
+
+
+class TrainConfig(_Spec):
+    """Training budget/hyperparameters. Classical controllers ignore it."""
+
+    total_timesteps: int = Field(gt=0)
+    seed: int = 0
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class TrainResult(_Spec):
+    """Outcome of `BaseController.train`. Classical controllers return timesteps=0."""
+
+    timesteps: int = Field(ge=0)
+    wall_time_s: float = Field(default=0.0, ge=0)
+    metrics: dict[str, float] = Field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class LinearModel:
+    """Linearisation x[k+1] = A (x[k]-x_eq) + B (u[k]-u_eq) + x_eq, sampled at `dt`.
+
+    Contract: A is (n, n), B is (n, m), x_eq is (n,), u_eq is (m,), all float arrays.
+    """
+
+    A: np.ndarray
+    B: np.ndarray
+    x_eq: np.ndarray
+    u_eq: np.ndarray
+    dt: float
+
+    def __post_init__(self) -> None:
+        n, m = self.B.shape
+        if self.A.shape != (n, n) or self.x_eq.shape != (n,) or self.u_eq.shape != (m,):
+            raise ValueError("inconsistent LinearModel shapes")
+        if self.dt <= 0:
+            raise ValueError("dt must be > 0")
+
+
+@dataclass(frozen=True)
+class EpisodeTrajectory:
+    """One recorded episode; the sole input to all metrics (pure functions over this type).
+
+    With T = number of steps taken:
+      observations, states: first axis T+1 (index 0 is the post-reset value);
+      actions: first axis T; rewards: shape (T,); dt: control period in seconds.
+    Exactly one of `terminated` (task failure/end) or `truncated` (time limit) may be True,
+    never both. `success` is judged by the environment's TaskSpec. `seed` is the reset seed.
+    """
+
+    observations: np.ndarray
+    actions: np.ndarray
+    rewards: np.ndarray
+    states: np.ndarray
+    dt: float
+    terminated: bool
+    truncated: bool
+    seed: int
+    success: bool
+
+    def __post_init__(self) -> None:
+        t = len(self.rewards)
+        if self.rewards.ndim != 1:
+            raise ValueError("rewards must be 1-D")
+        if len(self.actions) != t:
+            raise ValueError("actions must have length T")
+        if len(self.observations) != t + 1 or len(self.states) != t + 1:
+            raise ValueError("observations and states must have length T+1")
+        if self.dt <= 0:
+            raise ValueError("dt must be > 0")
+        if self.terminated and self.truncated:
+            raise ValueError("terminated and truncated are mutually exclusive")
+
+    @property
+    def n_steps(self) -> int:
+        return len(self.rewards)
+
+    @property
+    def time(self) -> np.ndarray:
+        """Time stamps (T+1,) in seconds matching `states`."""
+        return np.arange(self.n_steps + 1) * self.dt
