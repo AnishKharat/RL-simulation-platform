@@ -39,19 +39,24 @@ Violations raise `RegistryError` (a duplicate id raises `DuplicateIdError`).
 `{id, kind, metadata: <model_dump>, params_schema: params_model.model_json_schema() or {}}` so the frontend renders
 forms from `params_schema` with no per-robot code. `Registry.entries(kind)` lists; `Entry.validate_params(raw)` validates through the model and returns the RESOLVED params (defaults filled, `model_dump(mode="json")`); those, not the raw input, are what the experiment manager stores and hashes. An entry without a params model accepts only `{}`.
 
+**Supported params subset (checked at register time):** every field of a params model must be a scalar (`str`, `int`, `float`, `bool`), an `Enum`/`Literal`, an optional (`X | None`) of those, or a tuple/list of numbers or strings (use `Field(ge=, le=, ...)` constraints; they reach the JSON schema and become form limits). Nested models, dicts, lists of objects and nested arrays raise `RegistryError` at decoration: the frontend renders forms from the schema and has no generic object editor, so the subset is what keeps "no per-robot frontend code" true.
+
+**Param errors:** `Entry.validate_params` wraps pydantic's `ValidationError` into `ParamValidationError` (a `RegistryError` and `ValueError`) whose `.errors` is a JSON-safe list of `{loc, msg, type}` (`loc` a list of field path parts), which the API returns as its 422 body, so the frontend can mark the offending fields.
+
 **Single source of truth for parameters:** `EnvMetadata` and `ControllerMetadata` carry no `params_schema` / `default_params`. The JSON schema and defaults come only from the Pydantic params model passed to the decorator.
 
 **From core:** the registry imports `EnvMetadata` / `ControllerMetadata` from `rcl.core.types` (allowed edge registry -> core) and reads `action_space_kind` (env) and `supported_action_spaces` (controller) from them directly.
 
 ## 4. Compatibility filtering
 
-Declared, never hardcoded: `compatible_controllers(env_id)` returns controllers whose `supported_action_spaces`
-contains the env's `action_space_kind`; `compatible_environments(controller_id)` is the inverse. The API exposes
+Declared, never hardcoded (ADR 0014): `compatible_controllers(env_id)` returns controllers where the env's
+`action_space_kind` is in `supported_action_spaces`, `requires_linearization` implies the env is `linearizable`,
+and `EnvMetadata.action_dim <= max_action_dim` (when set); `compatible_environments(controller_id)` is the inverse. The API exposes
 both so the dropdown filters from registry data only.
 
 ## 5. Discovery
 
-`discover(packages=("rcl.environments", "rcl.controllers"))` walks each package with `pkgutil.walk_packages` and
+`discover(packages=DISCOVERY_PACKAGES)` (one constant: `rcl.environments`, `rcl.controllers`, `rcl.perturbations`, `rcl.ros_adapter`; a test keeps it equal to the import-linter plugin tier) walks each package with `pkgutil.walk_packages` and
 imports every module; importing runs the decorators. Subpackages (`controllers.classical`, `controllers.rl`) are
 covered by the recursive walk. Idempotent (Python caches imports). A module that fails to import raises
 `RegistryError` naming that module (not only the package) and chaining the cause: a broken robot file is loud, not silently missing.

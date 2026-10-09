@@ -13,7 +13,7 @@ being identical, and RL wrappers would duplicate the loop around `model.predict`
   `save`, `load` only.
 - The experiments layer owns one shared function `rollout(env, controller, n_episodes, seed) -> list[EpisodeTrajectory]`.
   Contract: episode `i` calls `env.reset(seed=seed + i)`, then loops `controller.predict(obs)` / `env.step(action)`
-  until `terminated or truncated`; states are recorded from `env.get_state()` (true state); `success` is judged
+  until `terminated` (failure), `truncated` (horizon) or success (`success_hold_steps`; both flags False); states are recorded from `env.get_state()` (true state); `success` is judged
   with `env.get_task_spec()`. It is documented in `docs/architecture/sequence-run-experiment.md`; implementation
   is a Phase 1 task (not implemented in Phase 0).
 

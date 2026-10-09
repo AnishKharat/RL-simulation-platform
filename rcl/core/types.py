@@ -38,6 +38,22 @@ class EnvMetadata(_Spec):
     `@register_environment(..., params=Model)`; the registry derives the JSON schema and the
     defaults from it. `version` is the component's own version string; it is recorded in
     `RunRecord.versions` (key `env:<id>`) so a changed robot model is visible in the record.
+
+    Compatibility facts (ADR 0014): `action_dim` is the number of action components (1 for a
+    single discrete choice); `linearizable` is True iff `get_linearization()` returns a model
+    (a test per environment asserts the two agree). The registry compares these with the
+    controller's declarations.
+
+    `simulated` is False for hardware-in-the-loop environments (Phase 7 ros_adapter): they have
+    no seeded determinism, so the experiment manager refuses multi-seed reproducibility
+    claims for them and blocks training on them (see `BaseEnvironment`).
+
+    Labels for plots and tables (all optional, empty = unlabelled): `state_labels` /
+    `state_units` name the components of the true state (equal lengths, at least `dof`, since
+    the state includes the positions); `action_labels` / `action_units` name the action
+    components (length `action_dim`). Example: ("x", "x_dot", "theta", "theta_dot") with
+    ("m", "m/s", "rad", "rad/s"). The frontend renders these without robot-specific code;
+    an environment test should assert `len(state_labels) == get_env_spec().state_dim`.
     """
 
     name: str
@@ -45,7 +61,26 @@ class EnvMetadata(_Spec):
     description: str = ""
     dof: int = Field(ge=1)
     action_space_kind: ActionSpaceKind
+    action_dim: int = Field(default=1, ge=1)
+    linearizable: bool = False
+    simulated: bool = True
     physics_backend: str
+    state_labels: tuple[str, ...] = ()
+    state_units: tuple[str, ...] = ()
+    action_labels: tuple[str, ...] = ()
+    action_units: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _check_labels(self) -> EnvMetadata:
+        if len(self.state_labels) != len(self.state_units):
+            raise ValueError("state_labels and state_units must have equal length")
+        if self.state_labels and len(self.state_labels) < self.dof:
+            raise ValueError("state labels must cover at least dof components")
+        if len(self.action_labels) != len(self.action_units):
+            raise ValueError("action_labels and action_units must have equal length")
+        if self.action_labels and len(self.action_labels) != self.action_dim:
+            raise ValueError("action_labels must have action_dim entries")
+        return self
 
 
 class EnvSpec(_Spec):
@@ -93,7 +128,12 @@ class ControllerMetadata(_Spec):
     hardcoded elsewhere: the registry uses it to filter compatible environments.
     `requires_training` is False for classical controllers (their `train` is a no-op); the
     experiment manager reads it from here to decide whether to train. `version` is recorded
-    in `RunRecord.versions` (key `controller:<id>`)."""
+    in `RunRecord.versions` (key `controller:<id>`).
+
+    Compatibility declarations (ADR 0014), all checked by the registry: the env's action kind
+    must be in `supported_action_spaces`; `requires_linearization` needs an env with
+    `EnvMetadata.linearizable`; `max_action_dim` (None = unlimited) bounds
+    `EnvMetadata.action_dim` (e.g. a scalar PID declares 1)."""
 
     name: str
     version: str = Field(min_length=1)
@@ -101,69 +141,89 @@ class ControllerMetadata(_Spec):
     family: ControllerFamily
     supported_action_spaces: tuple[ActionSpaceKind, ...] = Field(min_length=1)
     requires_training: bool
+    requires_linearization: bool = False
+    max_action_dim: int | None = Field(default=None, ge=1)
 
 
 class TaskSpec(_Spec):
     """What 'success' means for an environment, in true-state coordinates.
 
     Success: |state - setpoint| <= tolerance element-wise for `success_hold_steps` consecutive
-    steps before the episode ends. `horizon_steps` is the time limit applied to every
+    steps; the rollout then ends the episode with `terminated` and `truncated` both False
+    (success is not termination). `horizon_steps` is the time limit applied to every
     controller (fair-comparison protocol, project_context 6.8). Failure semantics (e.g. pole
     falls) are described in `failure_description` and signalled via `terminated`.
 
-    Metric signal: the scalar output is y = state[error_state_index] with reference
-    `y_ref = setpoint[error_state_index]` (a derived property, so it cannot disagree with
-    `setpoint`). The 2% settling band is |y - y_ref| <= 0.02 * max(|y_ref - y(0)|, step_floor);
-    `step_floor` is the minimum step size used when the commanded step is ~0. `angle_wrap`
-    is True when y is an angle (errors are wrapped to (-pi, pi]). The episode time limit is
+    Metric signal: the output is the vector y = state[error_state_indices] (at least one
+    component) with reference `y_ref = setpoint[error_state_indices]` (a derived property, so
+    it cannot disagree with `setpoint`). Per-component differences are wrapped to (-pi, pi]
+    for the state indices listed in `wrap_indices` (angles) and left as is otherwise; the
+    error is the Euclidean norm of the wrapped differences (metrics/DEFINITIONS.md). With one
+    index this is the scalar |y - y_ref|. The 2% settling band is
+    e <= 0.02 * max(S, step_floor) with S = ||y_ref - y(0)||; `step_floor` is the minimum step
+    size used when the commanded step is ~0. `output_unit` optionally names the unit shared by
+    all output components (e.g. "rad"); metrics report it as the unit of error-based values.
+    The episode time limit is
     T_max = horizon_steps * EnvSpec.dt (there is no separate time-limit field).
     """
 
     setpoint: tuple[float, ...]
     tolerance: tuple[float, ...]
-    error_state_index: int = Field(ge=0)
+    error_state_indices: tuple[int, ...] = Field(min_length=1)
+    wrap_indices: tuple[int, ...] = ()
+    output_unit: str | None = None
     step_floor: float = Field(gt=0)
     horizon_steps: int = Field(gt=0)
     success_hold_steps: int = Field(default=1, gt=0)
-    angle_wrap: bool = False
     failure_description: str = ""
 
     @model_validator(mode="after")
     def _check_shapes(self) -> TaskSpec:
         if len(self.tolerance) != len(self.setpoint):
             raise ValueError("tolerance and setpoint must have equal length")
-        if self.error_state_index >= len(self.setpoint):
-            raise ValueError("error_state_index out of range for setpoint")
+        idx = self.error_state_indices
+        if len(set(idx)) != len(idx) or any(not 0 <= i < len(self.setpoint) for i in idx):
+            raise ValueError("error_state_indices must be unique and within setpoint range")
+        if not set(self.wrap_indices) <= set(idx):
+            raise ValueError("wrap_indices must be a subset of error_state_indices")
         return self
 
     @property
-    def y_ref(self) -> float:
-        """Reference of the scalar output: `setpoint[error_state_index]`."""
-        return self.setpoint[self.error_state_index]
+    def y_ref(self) -> tuple[float, ...]:
+        """Reference of the output vector: `setpoint[i] for i in error_state_indices`."""
+        return tuple(self.setpoint[i] for i in self.error_state_indices)
 
 
 class TrainConfig(_Spec):
     """Training budget. Classical controllers ignore it. Algorithm hyperparameters (learning
     rate, gamma, network size, ...) are NOT here: they are the controller's own `params`,
-    validated by its registry params model."""
+    validated by its registry params model. `n_envs` is how many environments the controller
+    builds from the `env_factory` for vectorised training."""
 
     total_timesteps: int = Field(gt=0)
     seed: int = 0
+    n_envs: int = Field(default=1, ge=1)
 
 
 class TrainResult(_Spec):
-    """Outcome of `BaseController.train`. Classical controllers return timesteps=0."""
+    """Outcome of `BaseController.train`. Classical controllers return timesteps=0.
+    `curve` is the learning curve as `(timestep, mean_episode_return)` pairs, in order."""
 
     timesteps: int = Field(ge=0)
     wall_time_s: float = Field(default=0.0, ge=0)
     metrics: dict[str, float] = Field(default_factory=dict)
+    curve: tuple[tuple[int, float], ...] = ()
 
 
 @dataclass(frozen=True)
 class LinearModel:
-    """Linearisation x[k+1] = A (x[k]-x_eq) + B (u[k]-u_eq) + x_eq, sampled at `dt`.
+    """Linearisation z[k+1] = A (z[k]-z_eq) + B (u[k]-u_eq) + z_eq, sampled at `dt`, where z
+    is the OBSERVATION vector (what `predict` receives), not the true state.
 
-    Contract: A is (n, n), B is (n, m), x_eq is (n,), u_eq is (m,), all float arrays.
+    Contract: A is (n, n), B is (n, m), x_eq (the observation at equilibrium; the field name is
+    kept for brevity) is (n,), u_eq is (m,), all float arrays, n = prod(EnvSpec.obs_shape).
+    An environment whose observation differs from its state (noise, partial) expresses the
+    model in observation coordinates, so controllers need not know the state-to-obs map.
     """
 
     A: np.ndarray
@@ -187,8 +247,14 @@ class EpisodeTrajectory:
     With T = number of steps taken:
       observations, states: first axis T+1 (index 0 is the post-reset value);
       actions: first axis T; rewards: shape (T,); dt: control period in seconds.
-    Exactly one of `terminated` (task failure/end) or `truncated` (time limit) may be True,
-    never both. `success` is judged by the environment's TaskSpec. `seed` is the reset seed.
+    `commanded_actions` (optional, shape (T, ...)) is the controller's RAW `predict` output
+    before the environment clipped/mapped it, while `actions` are the values actually applied
+    (physical units); metrics use `actions`. `perturbation_steps` lists the step indices
+    `k` in [0, T) at which a perturbation was injected (empty without perturbations), used by
+    recovery-time metrics. `terminated` (task failure only) and `truncated` (time limit) are
+    never both True; both are
+    False when the episode ended on success (`success_hold_steps` reached). `success` is judged
+    by the environment's TaskSpec. `seed` is the reset seed.
     """
 
     observations: np.ndarray
@@ -200,9 +266,15 @@ class EpisodeTrajectory:
     truncated: bool
     seed: int
     success: bool
+    commanded_actions: np.ndarray | None = None
+    perturbation_steps: tuple[int, ...] = ()
 
     def __post_init__(self) -> None:
         t = len(self.rewards)
+        if self.commanded_actions is not None and len(self.commanded_actions) != t:
+            raise ValueError("commanded_actions must have length T")
+        if any(not 0 <= k < t for k in self.perturbation_steps):
+            raise ValueError("perturbation_steps must be step indices in [0, T)")
         if self.rewards.ndim != 1:
             raise ValueError("rewards must be 1-D")
         if len(self.actions) != t:

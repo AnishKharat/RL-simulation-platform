@@ -10,14 +10,16 @@ We want violations to fail in CI/pre-commit (`lint-imports`).
 ## Decision
 Dependency rules are encoded in `pyproject.toml` under `[tool.importlinter]` (root package `rcl`):
 - `core` imports no other `rcl` package.
-- `environments` and `controllers` may not import experiments, metrics, analytics, persistence, api, frontend
-  (so they import only `core` and `registry`, ADR 0003) and are `independence`-isolated from each other.
+- `environments`, `controllers`, `perturbations` and `ros_adapter` (plugin tier; the last two are empty packages until
+  Phase 4 / 7 so the contracts can already verify them) may not import experiments, metrics, analytics, persistence,
+  api, frontend (so they import only `core` and `registry`, ADR 0003) and are `independence`-isolated from each other.
+  `experiments`, `api`, `registry` and `frontend` may not import them either.
 - `registry` imports only `core`.
 - `experiments` may not import environments, controllers, analytics, api, frontend (it reaches them through the
   registry); `api` may not import environments, controllers, metrics, frontend.
 - `frontend` imports no other `rcl` package (HTTP only).
 - A `layers` contract: frontend > api > experiments > (analytics | persistence | metrics) >
-  (environments | controllers) > registry > core, downward only.
+  (environments | controllers | perturbations | ros_adapter) > registry > core, downward only.
 - `lint-imports` runs with tests and ruff before every commit.
 
 ## Consequences

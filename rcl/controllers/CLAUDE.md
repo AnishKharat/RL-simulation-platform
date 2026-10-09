@@ -4,5 +4,5 @@
 - Import only `rcl.core` (+ third-party). Never reference a concrete environment; use `BaseEnvironment`/`EnvSpec` only.
 - Declare supported action-space types (`discrete`/`continuous`), `requires_training`, and a Pydantic hyperparameter schema.
 - Classical `train()` is a no-op. `save`/`load` must round-trip.
-- Seeds passed explicitly; deterministic `predict` when `deterministic=True`.
+- Seeds passed explicitly; deterministic `predict` when `deterministic=True` (evaluation always uses it). RL controllers: `device` param defaults to `"cpu"` (ADR 0010); the determinism claim is CPU-only.
 - Tests per controller: configure → predict shape, save/load round-trip, runs on at least one compatible env.

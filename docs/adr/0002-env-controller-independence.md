@@ -13,7 +13,7 @@ frontend) would force edits across modules for each new robot or controller (pro
 - Compatibility is declared as data, not code:
   `EnvMetadata.action_space_kind` (`discrete | continuous`) and
   `ControllerMetadata.supported_action_spaces` (non-empty tuple).
-- `BaseController.configure(env_spec, params)` must raise `ValueError` if the env's kind is unsupported.
+- `BaseController.configure(env_spec, params, linear_model=None)` must raise `ValueError` if the env's kind is unsupported.
 - The registry derives `compatible_controllers(env_id)` / `compatible_environments(controller_id)` from the
   declarations; the API exposes them and the frontend filters dropdowns from that data only.
 - Controllers needing more than action-space kind (e.g. LQR needs `get_linearization()`) check at `configure`
@@ -21,6 +21,9 @@ frontend) would force edits across modules for each new robot or controller (pro
 
 ## Revisions (architecture review 1)
 - `requires_training` moved from a `BaseController` class attribute into `ControllerMetadata`, so the registry/API expose it without instantiation. Training hyperparameters are controller `params`; `TrainConfig`/`TrainingSection` hold only budget and seed.
+
+## Revisions (architecture review 2)
+- Superseded in part by ADR 0014: compatibility also covers linearization and action dimension.
 
 ## Consequences
 - Adding a robot or controller is one file; no existing module changes.

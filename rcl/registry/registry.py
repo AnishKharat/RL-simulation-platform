@@ -15,7 +15,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from rcl.core.types import ControllerMetadata, EnvMetadata
 
@@ -38,6 +38,15 @@ class DuplicateIdError(RegistryError):
 
 class UnknownIdError(RegistryError, KeyError):
     """Lookup of an id that is not registered."""
+
+
+class ParamValidationError(RegistryError, ValueError):
+    """Params rejected by an entry's params model. `errors` is the API-ready list of
+    `{loc, msg, type}` dicts (`loc` is a list of str/int, JSON-safe), one per problem."""
+
+    def __init__(self, message: str, errors: list[dict[str, Any]]) -> None:
+        super().__init__(message)
+        self.errors = errors
 
 
 @dataclass(frozen=True)
@@ -63,9 +72,24 @@ class Entry:
         Without a param model only an empty dict is accepted."""
         if self.params_model is None:
             if raw:
-                raise ValueError(f"{self.kind} {self.id!r} takes no params, got {sorted(raw)}")
+                extra: list[dict[str, Any]] = [
+                    {"loc": [k], "msg": "no params accepted", "type": "extra_forbidden"}
+                    for k in sorted(raw)
+                ]
+                raise ParamValidationError(
+                    f"{self.kind} {self.id!r} takes no params, got {sorted(raw)}", extra
+                )
             return {}
-        return self.params_model(**(raw or {})).model_dump(mode="json")
+        try:
+            return self.params_model(**(raw or {})).model_dump(mode="json")
+        except ValidationError as exc:
+            found: list[dict[str, Any]] = [
+                {"loc": list(e["loc"]), "msg": e["msg"], "type": e["type"]}
+                for e in exc.errors(include_url=False, include_context=False, include_input=False)
+            ]
+            raise ParamValidationError(
+                f"invalid params for {self.kind} {self.id!r}: {len(found)} error(s)", found
+            ) from exc
 
 
 class Registry:
@@ -94,6 +118,8 @@ class Registry:
                 f"params model {params.__qualname__} for {id!r} must set extra='forbid' "
                 "(typos in params must fail, not be ignored)"
             )
+        if params is not None:
+            _check_param_schema(id, params)
         existing = self._entries[kind].get(id)
         if existing is not None:
             # Same class re-imported (importlib.reload, module imported under two names)
@@ -116,25 +142,62 @@ class Registry:
         return [self._entries[kind][i] for i in sorted(self._entries[kind])]
 
     def compatible_controllers(self, env_id: str) -> list[Entry]:
-        """Controllers whose supported_action_spaces contain the env's action_space_kind."""
-        kind = self.get("environment", env_id).metadata.action_space_kind
-        return [c for c in self.entries("controller") if _supports(c.metadata, kind)]
+        """Controllers compatible with the env (ADR 0014: action kind, linearization, dim)."""
+        env_meta = self.get("environment", env_id).metadata
+        return [c for c in self.entries("controller") if _supports(c.metadata, env_meta)]
 
     def compatible_environments(self, controller_id: str) -> list[Entry]:
         """Inverse of :meth:`compatible_controllers`."""
         meta = self.get("controller", controller_id).metadata
-        return [
-            e for e in self.entries("environment") if _supports(meta, e.metadata.action_space_kind)
-        ]
+        return [e for e in self.entries("environment") if _supports(meta, e.metadata)]
+
+
+_SCALARS = {"string", "number", "integer", "boolean"}
+
+
+def _check_param_schema(id: str, model: type[BaseModel]) -> None:
+    """Enforce the form-renderable subset: every field is a scalar, an enum/Literal, an
+    optional of those, or an array (tuple/list) of numbers/strings. Nested objects and `$ref`s
+    to anything but a plain enum are rejected at register time (registry.md 3)."""
+    schema = model.model_json_schema()
+    defs = schema.get("$defs", {})
+
+    def ok(s: dict[str, Any], in_array: bool) -> bool:
+        if "$ref" in s:
+            target = defs.get(s["$ref"].rsplit("/", 1)[-1], {})
+            return "enum" in target and "properties" not in target
+        if "enum" in s or "const" in s:
+            return True
+        if "anyOf" in s:
+            return all(ok(b, in_array) for b in s["anyOf"])
+        t = s.get("type")
+        if t == "null" or t in _SCALARS:
+            return True
+        if t == "array" and not in_array:
+            items = [s["items"]] if "items" in s else s.get("prefixItems", [])
+            return all(ok(i, True) for i in items)
+        return False
+
+    for name, prop in schema.get("properties", {}).items():
+        if not ok(prop, False):
+            raise RegistryError(
+                f"params model {model.__qualname__} for {id!r}: field {name!r} is outside the "
+                "supported subset (scalars, enums, tuples/lists of numbers or strings)"
+            )
 
 
 def _class_key(cls: type) -> tuple[str, str]:
     return cls.__module__, cls.__qualname__
 
 
-def _supports(controller_meta: Any, kind: str) -> bool:
-    spaces: Collection[str] = controller_meta.supported_action_spaces
-    return kind in spaces
+def _supports(controller_meta: ControllerMetadata, env_meta: EnvMetadata) -> bool:
+    """Declared compatibility (ADR 0014): action kind, linearization, action dimension."""
+    if env_meta.action_space_kind not in controller_meta.supported_action_spaces:
+        return False
+    if controller_meta.requires_linearization and not env_meta.linearizable:
+        return False
+    max_dim = controller_meta.max_action_dim
+    return max_dim is None or env_meta.action_dim <= max_dim
 
 
 _default = Registry()
@@ -178,7 +241,17 @@ def register_controller(
     return _decorator("controller", id, params)
 
 
-def discover(packages: Collection[str] = ("rcl.environments", "rcl.controllers")) -> None:
+# Single list of plugin packages scanned for decorators; keep in sync with the import-linter
+# contracts in pyproject.toml (a test enforces it).
+DISCOVERY_PACKAGES: tuple[str, ...] = (
+    "rcl.environments",
+    "rcl.controllers",
+    "rcl.perturbations",
+    "rcl.ros_adapter",
+)
+
+
+def discover(packages: Collection[str] = DISCOVERY_PACKAGES) -> None:
     """Import every module under ``packages`` (recursively) so their decorators run.
 
     A module that fails to import raises ``RegistryError`` naming that module (not just the

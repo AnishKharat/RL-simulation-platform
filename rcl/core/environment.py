@@ -20,9 +20,18 @@ class BaseEnvironment(gym.Env[Any, Any], ABC):
       `step(action) -> (obs, reward, terminated, truncated, info)`, so SB3 works unchanged.
     * Determinism: all randomness comes from `self.np_random`, which is seeded ONLY through
       `reset(seed=...)` (never global RNGs, never a constructor seed). Same seed + same
-      actions => identical trajectory. Simulation, not wall-clock, drives time (`dt` fixed).
-    * `terminated` = task failure/natural end; `truncated` = the `TaskSpec.horizon_steps`
+      actions => identical trajectory, claimed for the same platform and library versions on
+      CPU only (GPU and multi-thread numerics are out of scope, ADR 0010). Simulation, not
+      wall-clock, drives time (`dt` fixed).
+    * `terminated` = task FAILURE only (e.g. the pole fell); success is NOT termination: the
+      episode otherwise runs to the horizon or until the rollout sees `success_hold_steps`
+      consecutive in-tolerance steps (both flags False then). `truncated` = the
+      `TaskSpec.horizon_steps`
       time limit. They are never both True.
+    * Hardware: an environment with `env_metadata.simulated == False` (real robot via the
+      ros_adapter) cannot honour the determinism clause above. The experiment manager then
+      refuses seeded-reproducibility and multi-seed benchmark claims for it, and blocks
+      training on it (evaluation of an already trained controller is allowed).
     * `env_metadata` (class level, `EnvMetadata`) is readable without instantiation and is
       what the registry/frontend use. It is distinct from gymnasium's `metadata` dict
       (render modes/fps), which subclasses still define as usual.

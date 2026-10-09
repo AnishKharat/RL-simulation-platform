@@ -30,3 +30,6 @@ Full design: `docs/architecture/registry.md`.
 - (b) store and decorator in `core`: puts global mutable state and discovery logic in an interface-only package.
 - Entry points / plugin packaging: more machinery than needed for in-repo components; revisit for third-party plugins.
 - Explicit central list of components: every new robot edits it, violating the one-file rule.
+
+## Revisions (architecture review 2)
+- Params models are restricted to a form-renderable subset (scalars, enums, tuples/lists of numbers or strings) checked at register time, and `validate_params` raises `ParamValidationError` carrying `[{loc, msg, type}]`. `discover()` scans the single `DISCOVERY_PACKAGES` constant (environments, controllers, perturbations, ros_adapter). See `docs/architecture/registry.md`.

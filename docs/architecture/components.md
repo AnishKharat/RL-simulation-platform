@@ -80,10 +80,17 @@ Dashed edges are special. The frontend edge is a network call, not an import. Th
 
 ## Where later modules slot in
 
-- **perturbations (Phase 4):** env wrappers (subclasses of `rcl.core.environment.EnvWrapper`, a `BaseEnvironment` + `gymnasium.Wrapper` that delegates `get_state` (true, unperturbed state), `get_task_spec`, `get_env_spec`, `env_metadata`, `get_linearization`) for disturbances, sensor noise, wind, mass variation. They import `core` only and are selected through the experiment config (a `perturbations:` list resolved by the experiment manager), so no environment or controller changes. Robustness metrics (failure count, recovery time) are added to `metrics`.
+- **perturbations (Phase 4):** env wrappers (subclasses of `rcl.core.environment.EnvWrapper`, a `BaseEnvironment` + `gymnasium.Wrapper` that delegates `get_state` (true, unperturbed state), `get_task_spec`, `get_env_spec`, `env_metadata`, `get_linearization`) for disturbances, sensor noise, wind, mass variation. They import `core` only and are selected through the experiment config (a `perturbations:` list resolved by the experiment manager), so no environment or controller changes. Robustness metrics (failure count, recovery time) are added to `metrics`. A `perturbation` registry kind with its own metadata (`PerturbationMetadata`) is deliberately NOT introduced yet; for now perturbations are referenced by id in `ExperimentConfig.perturbations` and resolved by the manager (Phase 4 item, see ADR 0014).
 - **ros_adapter (Phase 7):** another `BaseEnvironment` implementation that bridges to ROS2 hardware. It lives beside `environments`, imports `core` only, and registers like any robot, so controllers and the manager are unchanged. Policy export and a safety-limits layer sit in this package.
 - **PhysicsBackend (Phase 3+):** an interface (in `core`) that an environment uses internally to step a simulation; Gymnasium-native, PyBullet, and later MuJoCo implement it. It is chosen via `EnvMetadata.physics_backend`, invisible to controllers, and is the bottom of the layer stack in principle 6.
 
+## Planned: metrics catalog (Phase 1/2 note, not implemented)
+
+The frontend must not hardcode metric names, units or the choice of CI method. Plan: `analytics` exposes a catalog (`MetricInfo`: name, unit source, phase, CI method, higher-is-better) served by `GET /metrics`, built from the metrics package's own registry of definitions in `rcl/metrics/DEFINITIONS.md`. Decide the shape when the first metrics are implemented (Phase 1) and extend in Phase 2; no code before then.
+
 ## Layering contract note
+
+The plugin tier is `environments | controllers | perturbations | ros_adapter` (mutually independent; `perturbations` and `ros_adapter` exist as empty packages so import-linter can verify them before Phase 4 / 7).
+
 
 `pyproject.toml` layers: `analytics` sits in its own layer above `persistence | metrics` (which stay independent of each other), so `analytics -> persistence/metrics/core` is allowed by the layers contract, matching the diagram. Nothing in `experiments` or `api` may be imported by `analytics`.

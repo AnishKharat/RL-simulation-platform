@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 from typing import Any
 
@@ -75,3 +76,42 @@ def test_config_hash_ignores_seed_and_name_only() -> None:
     assert ExperimentConfig.model_validate(changed).config_hash() != base.config_hash()
     reordered = {k: VALID[k] for k in reversed(list(VALID))}
     assert ExperimentConfig.model_validate(reordered).config_hash() == base.config_hash()
+
+
+def test_perturbations_default_empty_and_hash_stable() -> None:
+    base = ExperimentConfig.model_validate(VALID)
+    assert base.schema_version == 1 and base.perturbations == []
+    explicit = ExperimentConfig.model_validate({**VALID, "perturbations": []})
+    assert explicit.config_hash() == base.config_hash()
+    # Empty list is excluded from the payload: pin the hash against drift.
+    payload = base.model_dump(mode="json", exclude={"seed", "name", "perturbations"})
+    blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    assert base.config_hash() == hashlib.sha256(blob.encode()).hexdigest()
+
+
+def test_perturbation_config_and_hash_sensitivity() -> None:
+    p = {"id": "obs_noise", "params": {"sigma": 0.01}}
+    cfg = ExperimentConfig.model_validate({**VALID, "perturbations": [p]})
+    assert cfg.perturbations[0].apply_to == "eval"
+    assert cfg.config_hash() != ExperimentConfig.model_validate(VALID).config_hash()
+    both = ExperimentConfig.model_validate({**VALID, "perturbations": [{**p, "apply_to": "both"}]})
+    assert both.config_hash() != cfg.config_hash()
+    assert ExperimentConfig.model_validate_json(both.model_dump_json()) == both
+    with pytest.raises(ValidationError):
+        ExperimentConfig.model_validate({**VALID, "perturbations": [{**p, "apply_to": "never"}]})
+    with pytest.raises(ValidationError):
+        ExperimentConfig.model_validate({**VALID, "perturbations": [{**p, "typo": 1}]})
+
+
+def test_run_record_accepts_torch_environment_keys() -> None:
+    cfg = ExperimentConfig.model_validate(VALID)
+    versions = {"torch": "2.3.0", "cuda": "none", "device": "cpu", "num_threads": "1"}
+    rec = RunRecord(
+        seed=1,
+        derived_seeds={"env": 1, "train": 2, "eval": 3},
+        config=cfg,
+        config_hash=cfg.config_hash(),
+        versions=versions,
+        code_version="abc",
+    )
+    assert RunRecord.model_validate_json(rec.model_dump_json()).versions == versions

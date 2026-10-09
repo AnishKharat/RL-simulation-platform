@@ -90,38 +90,43 @@ rcl/
 ## 5. Core Interfaces (proposed — refine in Phase 0)
 
 ### 5.1 BaseEnvironment
-Follow the **Gymnasium API** so SB3 and the ecosystem work out of the box.
+Follow the **Gymnasium API** so SB3 and the ecosystem work out of the box. Code: `rcl/core/environment.py`; naming and `get_env_spec`: ADR 0012.
 
 ```python
-class BaseEnvironment(gymnasium.Env):
-    metadata: EnvMetadata            # name, description, dof, obs/action spec, default params, physics backend
+class BaseEnvironment(gymnasium.Env, ABC):
+    env_metadata: ClassVar[EnvMetadata]   # class level; name, version, dof, action kind/dim, linearizable,
+                                          # simulated, physics_backend, state/action labels+units.
+                                          # (gymnasium's own `metadata` dict is untouched.)
 
     def reset(self, *, seed: int | None = None, options: dict | None = None) -> tuple[Obs, Info]
-    def step(self, action) -> tuple[Obs, float, bool, bool, Info]   # obs, reward, terminated, truncated, info
+    def step(self, action) -> tuple[Obs, float, bool, bool, Info]   # terminated = task FAILURE only; truncated = horizon
     def render(self) -> RenderOutput | None
-    def close(self) -> None
-    def get_observation_space(self) -> gymnasium.Space
-    def get_action_space(self) -> gymnasium.Space
+    def close(self) -> None               # idempotent
 
     # Needed for benchmarking and classical control:
-    def get_state(self) -> np.ndarray            # true state (for metrics, LQR)
-    def get_task_spec(self) -> TaskSpec          # setpoint, tolerances, what "success" and "failure" mean
-    def get_linearization(self) -> LinearModel | None   # optional, for LQR/MPC
+    def get_env_spec(self) -> EnvSpec            # runtime shapes, bounds, dt (handed to controllers)
+    def get_state(self) -> np.ndarray            # TRUE state (for metrics, LQR), shape (state_dim,)
+    def get_task_spec(self) -> TaskSpec          # setpoint, tolerance, output indices, horizon, success hold
+    def get_linearization(self) -> LinearModel | None   # optional, observation coordinates; default None
 ```
+Perturbations are `EnvWrapper` subclasses (a `BaseEnvironment` + `gymnasium.Wrapper`). Compatibility facts (`action_dim`, `linearizable`) and hardware semantics (`simulated`) live in `EnvMetadata`: ADR 0014, 0012.
 
 ### 5.2 BaseController
+Code: `rcl/core/controller.py`. Evaluation is not a controller method: the experiments layer owns the single shared `rollout` (ADR 0013). Training and checkpoints: ADR 0015.
+
 ```python
 class BaseController(ABC):
-    metadata: ControllerMetadata     # name, family (classical|rl), supported action spaces, hyperparameter schema
-    requires_training: bool
+    metadata: ClassVar[ControllerMetadata]   # name, version, family (classical|rl), supported_action_spaces,
+                                             # requires_training, requires_linearization, max_action_dim
 
-    def configure(self, env_spec: EnvSpec, params: dict) -> None
-    def predict(self, obs, deterministic: bool = True) -> Action
-    def train(self, env, config: TrainConfig) -> TrainResult      # no-op for classical
-    def evaluate(self, env, n_episodes: int, seed: int) -> list[EpisodeTrajectory]
-    def save(self, path) -> None
-    def load(self, path) -> None
+    def configure(self, env_spec: EnvSpec, params: dict, linear_model: LinearModel | None = None) -> None
+    def reset(self) -> None                  # per-episode state clear, called by rollout; default no-op
+    def predict(self, obs, deterministic: bool = True) -> Action   # RAW obs; controller normalises internally
+    def train(self, env_factory: Callable[[], BaseEnvironment], config: TrainConfig) -> TrainResult  # no-op for classical
+    def save(self, path: Path) -> None       # path = caller-created directory the controller fills
+    def load(self, path: Path) -> None
 ```
+Hyperparameters live in the controller's registry params model (not `TrainConfig`, which holds `total_timesteps`, `seed`, `n_envs`). Compatibility is declared in `ControllerMetadata` and checked by the registry (ADR 0014).
 
 ### 5.3 Registry
 - Decorator-based self-registration: `@register_environment("cartpole")`, `@register_controller("pid")`.
@@ -131,15 +136,16 @@ class BaseController(ABC):
 
 ### 5.4 Experiment config (single source of truth)
 ```yaml
-experiment:
-  name: pid_vs_ppo_cartpole
-  seed: 42
-  environment: { id: cartpole, params: {...} }
-  controller:  { id: pid, params: {...} }
-  training:    { total_timesteps: 100000 }   # RL only
-  evaluation:  { episodes: 20 }
+schema_version: 1
+name: pid_vs_ppo_cartpole
+seed: 42                                   # default root seed; each Run may override it
+environment:   { id: cartpole, params: {...} }
+controller:    { id: pid, params: {...} }
+perturbations: []                          # optional; [{ id, params, apply_to: train|eval|both }]
+training:      { total_timesteps: 100000 } # RL only
+evaluation:    { episodes: 20 }
 ```
-Validated with Pydantic, stored verbatim in the DB, and sufficient to reproduce a run.
+Implemented as `rcl.core.config.ExperimentConfig` (flat, no `experiment:` wrapper). Validated with Pydantic, stored verbatim (params resolved) in the DB, and sufficient to reproduce a run. `config_hash` excludes `seed` and `name` (and an empty `perturbations`). Fairness: same eval seeds across controllers for a run seed; training env uses the same wrapper stack as evaluation.
 
 ---
 

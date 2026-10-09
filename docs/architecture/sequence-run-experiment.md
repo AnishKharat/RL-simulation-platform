@@ -48,13 +48,16 @@ sequenceDiagram
     REG-->>EM: Entry (cls, metadata, params_model)
     EM->>EM: entry.validate_params(raw) -> resolved params, check action-space compatibility
     EM->>EM: derive seeds from experiment.seed
-    EM->>ENV: cls(**validated_params)
-    EM->>CTL: cls(), then configure(env_spec, validated_params)
+    EM->>ENV: cls(**validated_params) (evaluation env; training uses env_factory with the same wrapper stack)
+    EM->>ENV: get_env_spec(), get_linearization()
+    EM->>CTL: cls(), then configure(env_spec, validated_params, linear_model)
+    Note over EM,CTL: linear_model is in observation coordinates, None if the env offers none
 
     opt controller metadata requires_training
-        EM->>CTL: train(env, TrainConfig)
-        CTL->>ENV: reset(seed) / step(action) ...
-        CTL-->>EM: TrainResult (curves, checkpoint)
+        EM->>CTL: train(env_factory, TrainConfig(total_timesteps, seed, n_envs))
+        CTL->>ENV: env_factory() x n_envs, then reset(seed) / step(action) ...
+        CTL-->>EM: TrainResult (timesteps, curve)
+        EM->>CTL: save(checkpoint_dir) (dir created by EM; controller fills it)
         EM->>DB: save training artifact refs
     end
 
@@ -63,7 +66,7 @@ sequenceDiagram
         EM->>ENV: reset(seed)
         EM->>CTL: reset()
         EM->>CTL: predict(obs)
-        EM->>ENV: step(action) until terminated or truncated
+        EM->>ENV: step(action) until terminated (failure), truncated (horizon) or success_hold_steps reached
     end
     Note over EM: rollout() is the single shared evaluation loop (ADR 0013); returns list of EpisodeTrajectory
 
@@ -82,9 +85,10 @@ sequenceDiagram
 ## Seeding
 
 - `config.seed` is the experiment's default root seed; the Run's own `seed` (authoritative, may override it for multi-seed benchmarks) is the one used. The manager derives independent seeds with `numpy.random.SeedSequence(seed).spawn(...)`: one for env construction, one for training, one for evaluation.
+- Fairness: for the same run seed every controller gets identical evaluation seeds, and the training environment uses the same wrapper stack as the evaluation environment, except perturbations marked `apply_to: eval` (or `train`).
 - Evaluation episode `i` resets with `eval_seed + i` (or the i-th spawned child), so every controller in a benchmark sees identical initial states (§6.8).
 - No global RNG is used; seeds are passed explicitly to `reset`, `train`, and `evaluate`. The derived seeds are written to the Run row.
-- Evaluation is the experiments-layer function `rollout(env, controller, n_episodes, seed) -> list[EpisodeTrajectory]` (contract only, not yet implemented): it is the only evaluation loop, takes any `BaseController`, resets episode `i` with `seed + i`, calls `predict` until `terminated or truncated`, calls `controller.reset()` right after `env.reset`, records true states via `env.get_state()` and judges success with the env's `TaskSpec`.
+- Evaluation is the experiments-layer function `rollout(env, controller, n_episodes, seed) -> list[EpisodeTrajectory]` (contract only, not yet implemented): it is the only evaluation loop, takes any `BaseController`, resets episode `i` with `seed + i`, calls `predict(obs, deterministic=True)` until `terminated` (task failure), `truncated` (horizon) or `success_hold_steps` consecutive in-tolerance steps (success is not termination; both flags False), calls `controller.reset()` right after `env.reset`, records true states via `env.get_state()` and judges success with the env's `TaskSpec`.
 
 ## Failure path
 
