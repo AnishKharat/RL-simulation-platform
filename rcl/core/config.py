@@ -96,7 +96,9 @@ class RunRecord(_Strict):
     * `config` is the validated config as run (resolved params) and `config_hash` its
       `ExperimentConfig.config_hash()` (excludes seed and name).
     * `versions` maps name to version: python, numpy, gymnasium, pydantic, backend libs,
-      platform, plus registry entries as `env:<id>` and `controller:<id>`.
+      platform, plus registry entries as `env:<id>` and `controller:<id>`. RL runs also record
+      the numeric environment: `torch`, `cuda` ("none" if unavailable), `device` (e.g. "cpu")
+      and `num_threads` (`torch.get_num_threads()`), all as strings.
     * `code_version` is the commit sha (suffix `-dirty` if the tree had uncommitted changes).
     """
 

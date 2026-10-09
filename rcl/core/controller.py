@@ -50,6 +50,9 @@ class BaseController(ABC):
     * Observation normalisation (RL) is the controller's own state: it is fitted in `train`,
       saved/loaded with the controller, and applied inside `predict`, which always receives the
       RAW observation from the environment (ADR 0015). The rollout never normalises.
+    * Evaluation always calls `predict(obs, deterministic=True)` (greedy/mean action, no
+      sampling), so reproducibility claims cover that mode on CPU only (ADR 0010). RL
+      controllers take a `device` param defaulting to "cpu".
     * `predict(obs, deterministic=True)` is a pure function of the controller's state and
       `obs`; any stochasticity must come from RNGs seeded via `configure`/`train` config,
       never from global RNG state.

@@ -101,3 +101,17 @@ def test_perturbation_config_and_hash_sensitivity() -> None:
         ExperimentConfig.model_validate({**VALID, "perturbations": [{**p, "apply_to": "never"}]})
     with pytest.raises(ValidationError):
         ExperimentConfig.model_validate({**VALID, "perturbations": [{**p, "typo": 1}]})
+
+
+def test_run_record_accepts_torch_environment_keys() -> None:
+    cfg = ExperimentConfig.model_validate(VALID)
+    versions = {"torch": "2.3.0", "cuda": "none", "device": "cpu", "num_threads": "1"}
+    rec = RunRecord(
+        seed=1,
+        derived_seeds={"env": 1, "train": 2, "eval": 3},
+        config=cfg,
+        config_hash=cfg.config_hash(),
+        versions=versions,
+        code_version="abc",
+    )
+    assert RunRecord.model_validate_json(rec.model_dump_json()).versions == versions

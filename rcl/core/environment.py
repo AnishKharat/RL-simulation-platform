@@ -20,7 +20,9 @@ class BaseEnvironment(gym.Env[Any, Any], ABC):
       `step(action) -> (obs, reward, terminated, truncated, info)`, so SB3 works unchanged.
     * Determinism: all randomness comes from `self.np_random`, which is seeded ONLY through
       `reset(seed=...)` (never global RNGs, never a constructor seed). Same seed + same
-      actions => identical trajectory. Simulation, not wall-clock, drives time (`dt` fixed).
+      actions => identical trajectory, claimed for the same platform and library versions on
+      CPU only (GPU and multi-thread numerics are out of scope, ADR 0010). Simulation, not
+      wall-clock, drives time (`dt` fixed).
     * `terminated` = task FAILURE only (e.g. the pole fell); success is NOT termination: the
       episode otherwise runs to the horizon or until the rollout sees `success_hold_steps`
       consecutive in-tolerance steps (both flags False then). `truncated` = the
