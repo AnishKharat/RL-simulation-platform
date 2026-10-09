@@ -30,7 +30,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☐ Registry design doc + stub
 - ☐ Metric definitions doc
 - ☑ Import-linter rules for dependency layers
-- ☐ Spike: SB3 trains on a custom env
+- ☑ Spike: SB3 trains on a custom env
 - ☐ Spike: FastAPI background job
 - ☐ ADRs (one commit each)
 - ☐ Architecture review iteration 1 → revisions
