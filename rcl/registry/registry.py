@@ -116,25 +116,28 @@ class Registry:
         return [self._entries[kind][i] for i in sorted(self._entries[kind])]
 
     def compatible_controllers(self, env_id: str) -> list[Entry]:
-        """Controllers whose supported_action_spaces contain the env's action_space_kind."""
-        kind = self.get("environment", env_id).metadata.action_space_kind
-        return [c for c in self.entries("controller") if _supports(c.metadata, kind)]
+        """Controllers compatible with the env (ADR 0014: action kind, linearization, dim)."""
+        env_meta = self.get("environment", env_id).metadata
+        return [c for c in self.entries("controller") if _supports(c.metadata, env_meta)]
 
     def compatible_environments(self, controller_id: str) -> list[Entry]:
         """Inverse of :meth:`compatible_controllers`."""
         meta = self.get("controller", controller_id).metadata
-        return [
-            e for e in self.entries("environment") if _supports(meta, e.metadata.action_space_kind)
-        ]
+        return [e for e in self.entries("environment") if _supports(meta, e.metadata)]
 
 
 def _class_key(cls: type) -> tuple[str, str]:
     return cls.__module__, cls.__qualname__
 
 
-def _supports(controller_meta: Any, kind: str) -> bool:
-    spaces: Collection[str] = controller_meta.supported_action_spaces
-    return kind in spaces
+def _supports(controller_meta: ControllerMetadata, env_meta: EnvMetadata) -> bool:
+    """Declared compatibility (ADR 0014): action kind, linearization, action dimension."""
+    if env_meta.action_space_kind not in controller_meta.supported_action_spaces:
+        return False
+    if controller_meta.requires_linearization and not env_meta.linearizable:
+        return False
+    max_dim = controller_meta.max_action_dim
+    return max_dim is None or env_meta.action_dim <= max_dim
 
 
 _default = Registry()

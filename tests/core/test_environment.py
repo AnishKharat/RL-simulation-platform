@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from rcl.core.environment import BaseEnvironment, EnvWrapper
-from rcl.core.types import ActionSpaceKind, EnvMetadata, EnvSpec, TaskSpec
+from rcl.core.types import ActionSpaceKind, EnvMetadata, EnvSpec, LinearModel, TaskSpec
 
 
 def test_cannot_instantiate_abstract() -> None:
@@ -56,6 +56,20 @@ class _Dummy(BaseEnvironment):
             step_floor=0.05,
             horizon_steps=5,
         )
+
+
+class _Lin(_Dummy):
+    env_metadata = _Dummy.env_metadata.model_copy(update={"linearizable": True})
+
+    def get_linearization(self) -> LinearModel | None:
+        return LinearModel(np.eye(1), np.ones((1, 1)), np.zeros(1), np.zeros(1), 0.1)
+
+
+@pytest.mark.parametrize("cls", [_Dummy, _Lin])
+def test_linearizable_flag_agrees_with_get_linearization(cls: type[_Dummy]) -> None:
+    """Every environment's test suite should carry this check (ADR 0014)."""
+    env = cls()
+    assert env.env_metadata.linearizable == (env.get_linearization() is not None)
 
 
 def test_concrete_subclass_defaults() -> None:

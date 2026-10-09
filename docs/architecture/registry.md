@@ -45,8 +45,9 @@ forms from `params_schema` with no per-robot code. `Registry.entries(kind)` list
 
 ## 4. Compatibility filtering
 
-Declared, never hardcoded: `compatible_controllers(env_id)` returns controllers whose `supported_action_spaces`
-contains the env's `action_space_kind`; `compatible_environments(controller_id)` is the inverse. The API exposes
+Declared, never hardcoded (ADR 0014): `compatible_controllers(env_id)` returns controllers where the env's
+`action_space_kind` is in `supported_action_spaces`, `requires_linearization` implies the env is `linearizable`,
+and `EnvMetadata.action_dim <= max_action_dim` (when set); `compatible_environments(controller_id)` is the inverse. The API exposes
 both so the dropdown filters from registry data only.
 
 ## 5. Discovery

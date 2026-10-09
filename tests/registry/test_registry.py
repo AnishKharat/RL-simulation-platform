@@ -242,3 +242,40 @@ def test_discovery_reports_broken_module(
     with pytest.raises(RegistryError, match="fx_broken.boom"):
         discover(["fx_broken"])
     sys.modules.pop("fx_broken", None)
+
+
+def test_compatibility_checks_linearization_and_action_dim(reg: Registry) -> None:
+    def env(**kw: Any) -> type:
+        meta = EnvMetadata(
+            name="e",
+            version="0.1.0",
+            dof=2,
+            action_space_kind=ActionSpaceKind.CONTINUOUS,
+            physics_backend="none",
+            **kw,
+        )
+        return type("E", (), {"env_metadata": meta})
+
+    def ctl(**kw: Any) -> type:
+        meta = ControllerMetadata(
+            name="c",
+            version="0.1.0",
+            family=ControllerFamily.CLASSICAL,
+            supported_action_spaces=(ActionSpaceKind.CONTINUOUS,),
+            requires_training=False,
+            **kw,
+        )
+        return type("C", (), {"metadata": meta})
+
+    reg.register("environment", "plain", env())
+    reg.register("environment", "lin", env(linearizable=True))
+    reg.register("environment", "lin2", env(linearizable=True, action_dim=2))
+    reg.register("controller", "any", ctl())
+    reg.register("controller", "lqr", ctl(requires_linearization=True))
+    reg.register("controller", "scalar", ctl(max_action_dim=1))
+    ids = lambda es: [e.id for e in es]  # noqa: E731
+    assert ids(reg.compatible_controllers("plain")) == ["any", "scalar"]
+    assert ids(reg.compatible_controllers("lin")) == ["any", "lqr", "scalar"]
+    assert ids(reg.compatible_controllers("lin2")) == ["any", "lqr"]
+    assert ids(reg.compatible_environments("lqr")) == ["lin", "lin2"]
+    assert ids(reg.compatible_environments("scalar")) == ["lin", "plain"]

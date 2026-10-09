@@ -38,6 +38,11 @@ class EnvMetadata(_Spec):
     `@register_environment(..., params=Model)`; the registry derives the JSON schema and the
     defaults from it. `version` is the component's own version string; it is recorded in
     `RunRecord.versions` (key `env:<id>`) so a changed robot model is visible in the record.
+
+    Compatibility facts (ADR 0014): `action_dim` is the number of action components (1 for a
+    single discrete choice); `linearizable` is True iff `get_linearization()` returns a model
+    (a test per environment asserts the two agree). The registry compares these with the
+    controller's declarations.
     """
 
     name: str
@@ -45,6 +50,8 @@ class EnvMetadata(_Spec):
     description: str = ""
     dof: int = Field(ge=1)
     action_space_kind: ActionSpaceKind
+    action_dim: int = Field(default=1, ge=1)
+    linearizable: bool = False
     physics_backend: str
 
 
@@ -93,7 +100,12 @@ class ControllerMetadata(_Spec):
     hardcoded elsewhere: the registry uses it to filter compatible environments.
     `requires_training` is False for classical controllers (their `train` is a no-op); the
     experiment manager reads it from here to decide whether to train. `version` is recorded
-    in `RunRecord.versions` (key `controller:<id>`)."""
+    in `RunRecord.versions` (key `controller:<id>`).
+
+    Compatibility declarations (ADR 0014), all checked by the registry: the env's action kind
+    must be in `supported_action_spaces`; `requires_linearization` needs an env with
+    `EnvMetadata.linearizable`; `max_action_dim` (None = unlimited) bounds
+    `EnvMetadata.action_dim` (e.g. a scalar PID declares 1)."""
 
     name: str
     version: str = Field(min_length=1)
@@ -101,6 +113,8 @@ class ControllerMetadata(_Spec):
     family: ControllerFamily
     supported_action_spaces: tuple[ActionSpaceKind, ...] = Field(min_length=1)
     requires_training: bool
+    requires_linearization: bool = False
+    max_action_dim: int | None = Field(default=None, ge=1)
 
 
 class TaskSpec(_Spec):
