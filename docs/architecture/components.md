@@ -74,7 +74,7 @@ Dashed edges are special. The frontend edge is a network call, not an import. Th
 
 **persistence** provides SQLAlchemy models and repositories (SQLite now, PostgreSQL later by config). It stores the experiment catalog, run status, metric results, and artifact references; see `data-model.md`.
 
-**api** is a thin FastAPI layer: registry listing, create/run/get experiment, and analytics queries. Long jobs are handed to a background worker and polled by status. It contains no domain logic.
+**api** is a thin FastAPI layer: registry listing, create/run/get experiment, and analytics queries (endpoints and schemas: `api.md`, ADR 0016). Long jobs are handed to a background worker and polled by status. It contains no domain logic.
 
 **frontend** renders dropdowns, parameter forms and plots purely from API/registry metadata, and has zero environment-specific logic. Streamlit now; Next.js in Phase 5 consuming the same API.
 

@@ -86,5 +86,5 @@ the previous one, so nothing leaks between tests. Library code that needs a regi
 ## 8. How the API lists entries
 
 `GET /environments`, `GET /controllers` return `[entry.info() ...]`;
-`GET /environments/{id}/compatible-controllers` uses the filter. The API imports `rcl.registry` only, calls
+`GET /controllers/compatible?env_id=` uses the filter (full surface: `api.md`). The API imports `rcl.registry` only, calls
 `discover()` in its startup hook, and never names a concrete robot or controller.

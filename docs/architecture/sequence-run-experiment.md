@@ -1,6 +1,6 @@
 # Sequence: Run Experiment
 
-Covers `POST /experiments` through result display. Design rules: project_context §5.4 (config), §6.8-6.9 (fairness, background jobs), principle 5 (reproducibility). Endpoint names follow Phase 1: `/experiments`, `/experiments/{id}`.
+Covers `POST /experiments` through result display. Design rules: project_context §5.4 (config), §6.8-6.9 (fairness, background jobs), principle 5 (reproducibility). Endpoints and schemas: `api.md` (status is polled on the run, `GET /runs/{run_id}`).
 
 ## Status states
 
@@ -38,7 +38,7 @@ sequenceDiagram
     API->>API: validate config (Pydantic)
     API->>DB: insert Experiment + Run(status=queued), config verbatim
     API->>W: submit(run_id)
-    API-->>FE: 202 {run_id, status: queued}
+    API-->>FE: 202 {experiment_id, run_ids, status: queued}
 
     W->>DB: status = running, started_at
     W->>EM: execute(run_id)
@@ -76,9 +76,9 @@ sequenceDiagram
     EM->>DB: save trajectories as artifacts, metric rows, status = done, finished_at
 
     loop poll every 1-2 s
-        FE->>API: GET /experiments/{id}
+        FE->>API: GET /runs/{run_id}
         API->>DB: read run + metrics
-        API-->>FE: {status, progress, metrics?}
+        API-->>FE: {status, stage, progress, metrics?}
     end
     FE-->>U: plots and metric table (status = done)
 ```
@@ -109,8 +109,8 @@ sequenceDiagram
     EM->>EM: close env, release resources
     EM->>DB: status = failed, error, stage, finished_at
     EM-->>W: raises, worker logs with logging and continues
-    FE->>API: GET /experiments/{id}
-    API-->>FE: {status: failed, error: "..."}
+    FE->>API: GET /runs/{run_id}
+    API-->>FE: {status: failed, error: {type, message, stage}}
 ```
 
 Rules:
