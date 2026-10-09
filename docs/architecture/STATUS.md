@@ -9,7 +9,7 @@ Implementation (anything beyond docs, stubs, spikes) is allowed only when this s
 | # | Date | Focus | Changes / ADRs | Done |
 |---|------|-------|----------------|------|
 | 1 | 2026-10-10 | Interfaces, registry, config schema consistency | Registry/env_metadata fix, controller `reset()`, rollout moved to experiments (ADR 0013), TaskSpec cleanup, requires_training in metadata, single param-schema source, seed/config_hash, EnvSpec validators, EnvWrapper | ☑    |
-| 2 |      |       |                | ☐    |
+| 2 | 2026-10-10 | Extensibility: Phases 3/4/7 fit, compatibility, training, determinism | ADRs 0014-0015; configure(linear_model), train(env_factory), multi-output TaskSpec, T/N indexing, terminated=failure, schema_version+perturbations, perturbations/ros_adapter in contracts, labels/units, param-schema subset | ☑    |
 | 3 |      |       |                | ☐    |
 
 ## Freeze checklist
