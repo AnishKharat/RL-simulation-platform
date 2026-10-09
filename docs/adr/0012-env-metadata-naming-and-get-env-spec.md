@@ -30,4 +30,5 @@ Controllers have no such clash. Separately, controllers need a runtime descripti
 - Derive `EnvSpec` from gym spaces automatically: possible helper later, but `state_dim` and `dt` are not gym spaces.
 
 ## Revisions (architecture review 2)
+- `EnvMetadata.state_labels/state_units/action_labels/action_units` (optional, validated: equal pair lengths, state >= `dof`, action == `action_dim`) and `TaskSpec.output_unit` (optional) let the frontend and metrics label axes and values without robot-specific code.
 - `EnvMetadata.simulated: bool = True`. Hardware environments (Phase 7) set it False: no seeded determinism, so the experiment manager refuses multi-seed/reproducibility claims and blocks training on them; evaluation of an already trained controller stays allowed. Semantics are documented on `BaseEnvironment`.

@@ -47,6 +47,13 @@ class EnvMetadata(_Spec):
     `simulated` is False for hardware-in-the-loop environments (Phase 7 ros_adapter): they have
     no seeded determinism, so the experiment manager refuses multi-seed reproducibility
     claims for them and blocks training on them (see `BaseEnvironment`).
+
+    Labels for plots and tables (all optional, empty = unlabelled): `state_labels` /
+    `state_units` name the components of the true state (equal lengths, at least `dof`, since
+    the state includes the positions); `action_labels` / `action_units` name the action
+    components (length `action_dim`). Example: ("x", "x_dot", "theta", "theta_dot") with
+    ("m", "m/s", "rad", "rad/s"). The frontend renders these without robot-specific code;
+    an environment test should assert `len(state_labels) == get_env_spec().state_dim`.
     """
 
     name: str
@@ -58,6 +65,22 @@ class EnvMetadata(_Spec):
     linearizable: bool = False
     simulated: bool = True
     physics_backend: str
+    state_labels: tuple[str, ...] = ()
+    state_units: tuple[str, ...] = ()
+    action_labels: tuple[str, ...] = ()
+    action_units: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _check_labels(self) -> EnvMetadata:
+        if len(self.state_labels) != len(self.state_units):
+            raise ValueError("state_labels and state_units must have equal length")
+        if self.state_labels and len(self.state_labels) < self.dof:
+            raise ValueError("state labels must cover at least dof components")
+        if len(self.action_labels) != len(self.action_units):
+            raise ValueError("action_labels and action_units must have equal length")
+        if self.action_labels and len(self.action_labels) != self.action_dim:
+            raise ValueError("action_labels must have action_dim entries")
+        return self
 
 
 class EnvSpec(_Spec):
@@ -138,7 +161,9 @@ class TaskSpec(_Spec):
     error is the Euclidean norm of the wrapped differences (metrics/DEFINITIONS.md). With one
     index this is the scalar |y - y_ref|. The 2% settling band is
     e <= 0.02 * max(S, step_floor) with S = ||y_ref - y(0)||; `step_floor` is the minimum step
-    size used when the commanded step is ~0. The episode time limit is
+    size used when the commanded step is ~0. `output_unit` optionally names the unit shared by
+    all output components (e.g. "rad"); metrics report it as the unit of error-based values.
+    The episode time limit is
     T_max = horizon_steps * EnvSpec.dt (there is no separate time-limit field).
     """
 
@@ -146,6 +171,7 @@ class TaskSpec(_Spec):
     tolerance: tuple[float, ...]
     error_state_indices: tuple[int, ...] = Field(min_length=1)
     wrap_indices: tuple[int, ...] = ()
+    output_unit: str | None = None
     step_floor: float = Field(gt=0)
     horizon_steps: int = Field(gt=0)
     success_hold_steps: int = Field(default=1, gt=0)

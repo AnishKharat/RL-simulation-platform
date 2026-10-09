@@ -112,3 +112,51 @@ def test_env_wrapper_delegates_and_keeps_true_state() -> None:
 def test_env_wrapper_rejects_plain_gym_env() -> None:
     with pytest.raises(TypeError):
         EnvWrapper(gym.make("CartPole-v1"))  # type: ignore[arg-type]
+
+
+_BASE: dict[str, Any] = {
+    "name": "e",
+    "version": "0.1.0",
+    "dof": 2,
+    "action_space_kind": ActionSpaceKind.CONTINUOUS,
+    "physics_backend": "none",
+}
+
+
+def test_metadata_labels_valid_and_default_empty() -> None:
+    assert EnvMetadata(**_BASE).state_labels == ()
+    md = EnvMetadata(
+        **_BASE,
+        action_dim=1,
+        state_labels=("x", "x_dot", "th", "th_dot"),
+        state_units=("m", "m/s", "rad", "rad/s"),
+        action_labels=("force",),
+        action_units=("N",),
+    )
+    assert EnvMetadata.model_validate_json(md.model_dump_json()) == md
+
+
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {"state_labels": ("x", "v"), "state_units": ("m",)},
+        {"state_labels": ("x",), "state_units": ("m",)},  # fewer than dof=2
+        {"action_labels": ("f",), "action_units": ("N", "N")},
+        {"action_labels": ("f", "g"), "action_units": ("N", "N")},  # action_dim=1
+    ],
+)
+def test_metadata_label_validation(kw: dict[str, Any]) -> None:
+    with pytest.raises(ValueError):
+        EnvMetadata(**_BASE, **kw)
+
+
+def test_task_spec_output_unit_optional() -> None:
+    kw: dict[str, Any] = {
+        "setpoint": (0.0,),
+        "tolerance": (0.1,),
+        "error_state_indices": (0,),
+        "step_floor": 0.05,
+        "horizon_steps": 5,
+    }
+    assert TaskSpec(**kw).output_unit is None
+    assert TaskSpec(**kw, output_unit="rad").output_unit == "rad"
