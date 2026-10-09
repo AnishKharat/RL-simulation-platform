@@ -15,7 +15,9 @@ down there. Job function signature is `(job_id, config) -> result`.
 - The job store is thread-safe (lock). Worker exceptions are caught at the job boundary and recorded as `failed`
   plus an error message.
 - Status and progress are persisted to the DB in Phase 1; on startup, orphaned `running` jobs are marked `failed`.
-- Cancellation, when added, is cooperative (flag checked in the training callback); threads cannot be killed.
+- Cancellation, when added, is cooperative: the job's cancel flag is returned as `True` from the `progress`
+  callback passed to `BaseController.train` (ADR 0015), which is also how training progress reaches the job
+  store; threads cannot be killed.
 
 ## Consequences
 - Bounded concurrency, a `Future` handle, and tests that work under `TestClient` (BackgroundTasks blocks there).

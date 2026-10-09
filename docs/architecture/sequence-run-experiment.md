@@ -54,8 +54,9 @@ sequenceDiagram
     Note over EM,CTL: linear_model is in observation coordinates, None if the env offers none
 
     opt controller metadata requires_training
-        EM->>CTL: train(env_factory, TrainConfig(total_timesteps, seed, n_envs))
+        EM->>CTL: train(env_factory, TrainConfig(total_timesteps, seed, n_envs), progress)
         CTL->>ENV: env_factory() x n_envs, then reset(seed) / step(action) ...
+        CTL-->>EM: progress(done, total) periodically; EM writes RUN.progress; returns True to request stop
         CTL-->>EM: TrainResult (timesteps, curve)
         EM->>CTL: save(checkpoint_dir) (dir created by EM; controller fills it)
         EM->>DB: save training artifact refs

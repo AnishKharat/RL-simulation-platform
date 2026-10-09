@@ -12,6 +12,11 @@
 - `BaseController.train(env_factory: Callable[[], BaseEnvironment], config: TrainConfig) -> TrainResult`. The
   experiment manager supplies a factory that builds the environment with the same wrapper stack (perturbations,
   noise) as evaluation; the controller calls it `TrainConfig.n_envs` times (default 1) and owns what it builds.
+- `train` takes a third optional argument `progress: Callable[[int, int], bool | None] | None = None`. The
+  controller calls `progress(done_timesteps, total_timesteps)` periodically (RL: from the SB3 callback). The
+  experiment manager uses it to write `RUN.progress`/`stage` (ADR 0007). Returning `True` requests a cooperative
+  stop: the controller ends training early and returns a `TrainResult` for the timesteps actually done. `None` or
+  `False` continues. Classical controllers ignore it.
 - `TrainResult.curve: tuple[tuple[int, float], ...] = ()` carries `(timestep, mean_episode_return)` pairs.
 - The controller owns observation-normalisation state. It is fitted in `train`, persisted by `save`, restored by
   `load`, and applied inside `predict`, which receives the RAW observation. The rollout never normalises.

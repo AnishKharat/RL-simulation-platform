@@ -66,7 +66,9 @@ def test_train_takes_env_factory_and_save_gets_directory(tmp_path: Path) -> None
         "self",
         "env_factory",
         "config",
+        "progress",
     ]
+    assert inspect.signature(BaseController.train).parameters["progress"].default is None
     calls: list[int] = []
     res = _Const().train(lambda: calls.append(1), TrainConfig(total_timesteps=1, n_envs=3))  # type: ignore[arg-type,return-value]
     assert res.curve == () and calls == []  # classical default never builds an env
@@ -76,6 +78,16 @@ def test_train_takes_env_factory_and_save_gets_directory(tmp_path: Path) -> None
         TrainConfig(total_timesteps=1, n_envs=0)
     r = TrainResult(timesteps=2, curve=((1, 0.5), (2, 1.0)))
     assert TrainResult.model_validate_json(r.model_dump_json()) == r
+
+
+def test_default_train_never_calls_progress() -> None:
+    seen: list[tuple[int, int]] = []
+    res = _Const().train(
+        lambda: None,  # type: ignore[arg-type,return-value]
+        TrainConfig(total_timesteps=1),
+        lambda d, t: seen.append((d, t)),  # type: ignore[func-returns-value]
+    )
+    assert res.timesteps == 0 and seen == []
 
 
 def test_default_reset_is_noop() -> None:
