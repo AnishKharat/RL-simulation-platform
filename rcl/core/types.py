@@ -6,12 +6,12 @@ Array-carrying types are frozen dataclasses that validate their shape invariants
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ActionSpaceKind(StrEnum):
@@ -33,17 +33,19 @@ class _Spec(BaseModel):
 class EnvMetadata(_Spec):
     """Static, class-level description of an environment (drives registry/frontend forms).
 
-    Contract: available without instantiating the environment. `params_schema` is the JSON
-    schema of the constructor parameters; `default_params` must validate against it.
+    Contract: available without instantiating the environment. It carries no parameter
+    schema: the single source of truth is the Pydantic params model given to
+    `@register_environment(..., params=Model)`; the registry derives the JSON schema and the
+    defaults from it. `version` is the component's own version string; it is recorded in
+    `RunRecord.versions` (key `env:<id>`) so a changed robot model is visible in the record.
     """
 
     name: str
+    version: str = Field(min_length=1)
     description: str = ""
     dof: int = Field(ge=1)
     action_space_kind: ActionSpaceKind
     physics_backend: str
-    default_params: dict[str, Any] = Field(default_factory=dict)
-    params_schema: dict[str, Any] = Field(default_factory=dict)
 
 
 class EnvSpec(_Spec):
@@ -51,7 +53,8 @@ class EnvSpec(_Spec):
 
     Contract: shapes/bounds are those of the instance's gymnasium spaces; `dt` is the control
     period in seconds. `n_actions` is set iff `action_space_kind` is DISCRETE;
-    `action_low/high` are set iff CONTINUOUS.
+    `action_low/high` are set iff CONTINUOUS, with equal lengths (= prod(action_shape) when
+    `action_shape` is given) and low <= high. Violations raise at construction.
     """
 
     env_id: str
@@ -64,16 +67,40 @@ class EnvSpec(_Spec):
     action_low: tuple[float, ...] | None = None
     action_high: tuple[float, ...] | None = None
 
+    @model_validator(mode="after")
+    def _check_action_fields(self) -> EnvSpec:
+        if self.action_space_kind is ActionSpaceKind.DISCRETE:
+            if (
+                self.n_actions is None
+                or self.action_low is not None
+                or self.action_high is not None
+            ):
+                raise ValueError("DISCRETE requires n_actions and forbids action_low/action_high")
+            return self
+        if self.n_actions is not None or self.action_low is None or self.action_high is None:
+            raise ValueError("CONTINUOUS requires action_low/action_high and forbids n_actions")
+        if len(self.action_low) != len(self.action_high):
+            raise ValueError("action_low and action_high must have equal length")
+        if any(lo > hi for lo, hi in zip(self.action_low, self.action_high, strict=True)):
+            raise ValueError("action_low must be <= action_high element-wise")
+        if self.action_shape and len(self.action_low) != math.prod(self.action_shape):
+            raise ValueError("action_low/high length must equal prod(action_shape)")
+        return self
+
 
 class ControllerMetadata(_Spec):
     """Static description of a controller. `supported_action_spaces` is declared, never
-    hardcoded elsewhere: the registry uses it to filter compatible environments."""
+    hardcoded elsewhere: the registry uses it to filter compatible environments.
+    `requires_training` is False for classical controllers (their `train` is a no-op); the
+    experiment manager reads it from here to decide whether to train. `version` is recorded
+    in `RunRecord.versions` (key `controller:<id>`)."""
 
     name: str
+    version: str = Field(min_length=1)
     description: str = ""
     family: ControllerFamily
     supported_action_spaces: tuple[ActionSpaceKind, ...] = Field(min_length=1)
-    params_schema: dict[str, Any] = Field(default_factory=dict)
+    requires_training: bool
 
 
 class TaskSpec(_Spec):
@@ -84,29 +111,44 @@ class TaskSpec(_Spec):
     controller (fair-comparison protocol, project_context 6.8). Failure semantics (e.g. pole
     falls) are described in `failure_description` and signalled via `terminated`.
 
-    Metric signal: the scalar output is y = state[error_state_index], its reference is `y_ref`
-    (the 2% settling band is |y - y_ref| <= 0.02 * max(|y_ref - y(0)|, step_floor); `step_floor`
-    is the minimum step size used when the commanded step is ~0). `time_limit_s` equals
-    horizon_steps * dt of the environment.
+    Metric signal: the scalar output is y = state[error_state_index] with reference
+    `y_ref = setpoint[error_state_index]` (a derived property, so it cannot disagree with
+    `setpoint`). The 2% settling band is |y - y_ref| <= 0.02 * max(|y_ref - y(0)|, step_floor);
+    `step_floor` is the minimum step size used when the commanded step is ~0. `angle_wrap`
+    is True when y is an angle (errors are wrapped to (-pi, pi]). The episode time limit is
+    T_max = horizon_steps * EnvSpec.dt (there is no separate time-limit field).
     """
 
     setpoint: tuple[float, ...]
     tolerance: tuple[float, ...]
     error_state_index: int = Field(ge=0)
-    y_ref: float
     step_floor: float = Field(gt=0)
-    time_limit_s: float = Field(gt=0)
     horizon_steps: int = Field(gt=0)
     success_hold_steps: int = Field(default=1, gt=0)
+    angle_wrap: bool = False
     failure_description: str = ""
+
+    @model_validator(mode="after")
+    def _check_shapes(self) -> TaskSpec:
+        if len(self.tolerance) != len(self.setpoint):
+            raise ValueError("tolerance and setpoint must have equal length")
+        if self.error_state_index >= len(self.setpoint):
+            raise ValueError("error_state_index out of range for setpoint")
+        return self
+
+    @property
+    def y_ref(self) -> float:
+        """Reference of the scalar output: `setpoint[error_state_index]`."""
+        return self.setpoint[self.error_state_index]
 
 
 class TrainConfig(_Spec):
-    """Training budget/hyperparameters. Classical controllers ignore it."""
+    """Training budget. Classical controllers ignore it. Algorithm hyperparameters (learning
+    rate, gamma, network size, ...) are NOT here: they are the controller's own `params`,
+    validated by its registry params model."""
 
     total_timesteps: int = Field(gt=0)
     seed: int = 0
-    params: dict[str, Any] = Field(default_factory=dict)
 
 
 class TrainResult(_Spec):

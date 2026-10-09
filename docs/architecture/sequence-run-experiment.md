@@ -15,7 +15,7 @@ stateDiagram-v2
     failed --> [*]
 ```
 
-`failed` rows keep `error` (type, message, traceback) and the stage reached. No automatic retry; a re-run creates a new experiment with the same config and seed.
+`failed` rows keep `error` (type, message, traceback) and the stage reached. No automatic retry; a re-run adds a new Run to the same Experiment (ADR 0009), with the same config and seed unless overridden.
 
 ## Main flow
 
@@ -44,26 +44,28 @@ sequenceDiagram
     W->>EM: execute(run_id)
     EM->>DB: load config
     EM->>EM: record versions (python, libs, git sha)
-    EM->>REG: get_environment(env.id), get_controller(ctl.id)
-    REG-->>EM: classes + parameter schemas
-    EM->>EM: validate params against schemas, check action-space compatibility
+    EM->>REG: get("environment", env.id), get("controller", ctl.id)
+    REG-->>EM: Entry (cls, metadata, params_model)
+    EM->>EM: entry.validate_params(raw) -> resolved params, check action-space compatibility
     EM->>EM: derive seeds from experiment.seed
-    EM->>ENV: create(params)
-    EM->>CTL: configure(env_spec, params)
+    EM->>ENV: cls(**validated_params)
+    EM->>CTL: cls(), then configure(env_spec, validated_params)
 
-    opt controller.requires_training
-        EM->>CTL: train(env, TrainConfig, seed)
+    opt controller metadata requires_training
+        EM->>CTL: train(env, TrainConfig)
         CTL->>ENV: reset(seed) / step(action) ...
         CTL-->>EM: TrainResult (curves, checkpoint)
         EM->>DB: save training artifact refs
     end
 
-    EM->>CTL: evaluate(env, n_episodes, eval_seed)
+    EM->>EM: rollout(env, controller, n_episodes, eval_seed)
     loop each episode i, reset seed = eval_seed + i
-        CTL->>ENV: reset(seed)
-        CTL->>ENV: step(predict(obs)) until terminated or truncated
+        EM->>ENV: reset(seed)
+        EM->>CTL: reset()
+        EM->>CTL: predict(obs)
+        EM->>ENV: step(action) until terminated or truncated
     end
-    CTL-->>EM: list of EpisodeTrajectory
+    Note over EM: rollout() is the single shared evaluation loop (ADR 0013); returns list of EpisodeTrajectory
 
     EM->>MET: compute(trajectory, task_spec) per episode
     MET-->>EM: MetricResult values
@@ -79,9 +81,10 @@ sequenceDiagram
 
 ## Seeding
 
-- One `experiment.seed` is stored in the config. The manager derives independent seeds with `numpy.random.SeedSequence(seed).spawn(...)`: one for env construction, one for training, one for evaluation.
+- `config.seed` is the experiment's default root seed; the Run's own `seed` (authoritative, may override it for multi-seed benchmarks) is the one used. The manager derives independent seeds with `numpy.random.SeedSequence(seed).spawn(...)`: one for env construction, one for training, one for evaluation.
 - Evaluation episode `i` resets with `eval_seed + i` (or the i-th spawned child), so every controller in a benchmark sees identical initial states (§6.8).
 - No global RNG is used; seeds are passed explicitly to `reset`, `train`, and `evaluate`. The derived seeds are written to the Run row.
+- Evaluation is the experiments-layer function `rollout(env, controller, n_episodes, seed) -> list[EpisodeTrajectory]` (contract only, not yet implemented): it is the only evaluation loop, takes any `BaseController`, resets episode `i` with `seed + i`, calls `predict` until `terminated or truncated`, calls `controller.reset()` right after `env.reset`, records true states via `env.get_state()` and judges success with the env's `TaskSpec`.
 
 ## Failure path
 
@@ -96,7 +99,7 @@ sequenceDiagram
     participant FE as Frontend
 
     W->>EM: execute(run_id)
-    EM->>CTL: train / evaluate
+    EM->>CTL: train / predict (rollout)
     CTL--xEM: exception (NaN loss, env error, bad params)
     EM->>EM: close env, release resources
     EM->>DB: status = failed, error, stage, finished_at

@@ -51,12 +51,27 @@ def test_invalid(mutate: Any) -> None:
 
 
 def test_run_record() -> None:
+    cfg = ExperimentConfig.model_validate(VALID)
     rec = RunRecord(
-        seed=42,
-        config=ExperimentConfig.model_validate(VALID),
-        library_versions={"numpy": "2.0"},
+        seed=7,
+        derived_seeds={"env": 1, "train": 2, "eval": 3},
+        config=cfg,
+        config_hash=cfg.config_hash(),
+        versions={"numpy": "2.0", "controller:pid": "0.1.0"},
         code_version="abc123",
     )
     assert RunRecord.model_validate_json(rec.model_dump_json()) == rec
     with pytest.raises(ValidationError):
         RunRecord.model_validate({**rec.model_dump(), "extra": 1})
+
+
+def test_config_hash_ignores_seed_and_name_only() -> None:
+    base = ExperimentConfig.model_validate(VALID)
+    other = ExperimentConfig.model_validate({**VALID, "seed": 99, "name": "renamed"})
+    assert base.config_hash() == other.config_hash()
+    assert len(base.config_hash()) == 64
+    changed = copy.deepcopy(VALID)
+    changed["controller"]["params"]["kp"] = 2.0
+    assert ExperimentConfig.model_validate(changed).config_hash() != base.config_hash()
+    reordered = {k: VALID[k] for k in reversed(list(VALID))}
+    assert ExperimentConfig.model_validate(reordered).config_hash() == base.config_hash()

@@ -6,6 +6,8 @@ YAML-friendly: load YAML to a plain dict and call `ExperimentConfig.model_valida
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,17 +19,19 @@ class _Strict(BaseModel):
 
 class ComponentConfig(_Strict):
     """Reference to a registry entry: `id` is a registry key, `params` are validated later
-    against that entry's parameter schema (core cannot know it)."""
+    against that entry's params model (core cannot know it). The experiment manager replaces
+    `params` with the RESOLVED params (defaults filled, `Entry.validate_params`) before the
+    config is hashed and stored, so a stored config never depends on today's defaults."""
 
     id: str = Field(min_length=1)
     params: dict[str, Any] = Field(default_factory=dict)
 
 
 class TrainingSection(_Strict):
-    """Training budget (RL only; ignored by classical controllers)."""
+    """Training budget (RL only; ignored by classical controllers). Hyperparameters live in
+    `controller.params`, not here."""
 
     total_timesteps: int = Field(gt=0)
-    params: dict[str, Any] = Field(default_factory=dict)
 
 
 class EvaluationSection(_Strict):
@@ -39,10 +43,14 @@ class EvaluationSection(_Strict):
 class ExperimentConfig(_Strict):
     """Complete, validated description of one experiment; sufficient to reproduce it.
 
-    Seeding contract: `seed` is the ONLY seed in the config. The environment, training and
-    evaluation seeds are derived from it by the experiment manager with
-    `numpy.random.SeedSequence(seed)` spawning; evaluation episode i resets the environment
-    with `eval_seed + i`. Stored verbatim in the DB.
+    Seeding contract: `seed` is the ONLY seed in the config, the default root seed of the
+    experiment. Each Run may override it (`RunRecord.seed` is authoritative for that run);
+    the environment, training and evaluation seeds are derived from the run's seed by the
+    experiment manager with `numpy.random.SeedSequence(seed)` spawning; evaluation episode i
+    resets the environment with `eval_seed + i`.
+
+    `config_hash()` identifies the experiment DEFINITION and therefore excludes `seed` (varied
+    per Run) and `name` (a label), so all seeds of one benchmark cell share one hash.
     """
 
     name: str = Field(min_length=1)
@@ -52,16 +60,29 @@ class ExperimentConfig(_Strict):
     training: TrainingSection | None = None
     evaluation: EvaluationSection
 
+    def config_hash(self) -> str:
+        """sha256 hex of the canonical JSON (sorted keys, no spaces) of the config without
+        `seed` and `name`. Hash the RESOLVED config (defaults filled by the registry)."""
+        data = self.model_dump(mode="json", exclude={"seed", "name"})
+        blob = json.dumps(data, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
 
 class RunRecord(_Strict):
     """Reproducibility block stored with every run: what exactly was executed.
 
-    `config` is the validated config as run, `library_versions` maps package name to
-    version (numpy, gymnasium, pydantic, backend libs, ...), `code_version` is the git commit
-    (suffix `-dirty` if the tree had uncommitted changes).
+    * `seed`: the AUTHORITATIVE root seed of this run (may differ from `config.seed`, the
+      experiment default); `derived_seeds` are spawned from it, keys `env`, `train`, `eval`.
+    * `config` is the validated config as run (resolved params) and `config_hash` its
+      `ExperimentConfig.config_hash()` (excludes seed and name).
+    * `versions` maps name to version: python, numpy, gymnasium, pydantic, backend libs,
+      platform, plus registry entries as `env:<id>` and `controller:<id>`.
+    * `code_version` is the commit sha (suffix `-dirty` if the tree had uncommitted changes).
     """
 
     seed: int = Field(ge=0)
+    derived_seeds: dict[str, int]
     config: ExperimentConfig
-    library_versions: dict[str, str]
+    config_hash: str
+    versions: dict[str, str]
     code_version: str

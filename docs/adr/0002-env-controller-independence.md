@@ -19,6 +19,9 @@ frontend) would force edits across modules for each new robot or controller (pro
 - Controllers needing more than action-space kind (e.g. LQR needs `get_linearization()`) check at `configure`
   and fail loudly; richer capability declaration is not yet decided (see Consequences).
 
+## Revisions (architecture review 1)
+- `requires_training` moved from a `BaseController` class attribute into `ControllerMetadata`, so the registry/API expose it without instantiation. Training hyperparameters are controller `params`; `TrainConfig`/`TrainingSection` hold only budget and seed.
+
 ## Consequences
 - Adding a robot or controller is one file; no existing module changes.
 - Action-space kind is a coarse compatibility test: it admits pairs that still fail (LQR on an env without a

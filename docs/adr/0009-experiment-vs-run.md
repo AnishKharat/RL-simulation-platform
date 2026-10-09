@@ -1,6 +1,6 @@
 # 0009. Experiment vs Run data model
 
-- Status: Proposed
+- Status: Accepted (review 1)
 - Date: 2026-10-10
 
 ## Context
@@ -15,14 +15,13 @@ the reusable definition from one execution but leaves the multi-seed shape open 
 - Children hang off `RUN`: `EPISODE`, `METRIC_RESULT`, `ARTIFACT`.
 - Phase 1 creates exactly one Run per Experiment.
 - Multi-seed benchmarks (Phase 2): preferred is one Run per seed under a shared Experiment, so aggregation is
-  `GROUP BY experiment_id`. Because `ExperimentConfig.seed` is part of the config (ADR 0004), this needs either
-  config_hash computed with the seed excluded or the seed overridden per Run; to be settled before Phase 2.
+  `GROUP BY experiment_id`. Settled: `ExperimentConfig.config_hash()` excludes `seed` and `name`, and `RUN.seed`
+  (`RunRecord.seed`) is the authoritative per-run seed; `config.seed` is only the default.
 - `BENCHMARK_SUITE` / `BENCHMARK_RUN` / `AGGREGATE_RESULT` arrive in Phase 2.
 
 ## Consequences
 - Re-running an experiment (retry, rerun after a code change) adds a Run, preserving history.
 - Aggregation queries stay simple under the preferred option.
-- Open: how `config.seed` and `config_hash` interact with per-Run seeds (above).
 
 ## Alternatives
 - One Experiment per (controller, env, seed) cell: no run-level grouping, so aggregation needs a suite join and

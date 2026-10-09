@@ -1,6 +1,7 @@
 """Environment and controller registry. See docs/architecture/registry.md.
 
-Contract: imports only ``rcl.core`` (currently nothing; metadata is read structurally).
+Contract: imports only ``rcl.core``. Environments expose their static description as
+``cls.env_metadata`` (ADR 0012), controllers as ``cls.metadata``; both are type-checked on register.
 The default registry is the single piece of global state in the project.
 """
 
@@ -16,7 +17,14 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
+from rcl.core.types import ControllerMetadata, EnvMetadata
+
 Kind = Literal["environment", "controller"]
+# Class attribute holding the static metadata, and its required type, per kind.
+_META: dict[str, tuple[str, type[BaseModel]]] = {
+    "environment": ("env_metadata", EnvMetadata),
+    "controller": ("metadata", ControllerMetadata),
+}
 _ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
@@ -34,7 +42,8 @@ class UnknownIdError(RegistryError, KeyError):
 
 @dataclass(frozen=True)
 class Entry:
-    """One registered class. ``metadata`` is ``cls.metadata`` (core's Env/ControllerMetadata)."""
+    """One registered class. ``metadata`` is ``cls.env_metadata`` (environments) or
+    ``cls.metadata`` (controllers): core's ``EnvMetadata`` / ``ControllerMetadata``."""
 
     kind: Kind
     id: str
@@ -44,15 +53,19 @@ class Entry:
 
     def info(self) -> dict[str, Any]:
         """API/frontend-facing description: metadata plus the JSON schema for the param form."""
-        meta = self.metadata.model_dump() if hasattr(self.metadata, "model_dump") else self.metadata
+        meta = self.metadata.model_dump(mode="json")
         schema = self.params_model.model_json_schema() if self.params_model else {}
         return {"id": self.id, "kind": self.kind, "metadata": meta, "params_schema": schema}
 
     def validate_params(self, raw: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Validate ``raw`` against the param model (defaults filled in); {} if none declared."""
+        """Validate ``raw`` against the param model and return the RESOLVED params: defaults
+        filled, JSON-safe (``model_dump(mode="json")``). These are what gets stored/hashed.
+        Without a param model only an empty dict is accepted."""
         if self.params_model is None:
-            return dict(raw or {})
-        return self.params_model(**(raw or {})).model_dump()
+            if raw:
+                raise ValueError(f"{self.kind} {self.id!r} takes no params, got {sorted(raw)}")
+            return {}
+        return self.params_model(**(raw or {})).model_dump(mode="json")
 
 
 class Registry:
@@ -67,18 +80,30 @@ class Registry:
         """Add an entry; raises RegistryError (bad entry) or DuplicateIdError."""
         if not _ID_RE.match(id):
             raise RegistryError(f"invalid {kind} id {id!r}: must match {_ID_RE.pattern}")
-        if not hasattr(cls, "metadata"):
-            raise RegistryError(f"{cls.__qualname__} has no `metadata` attribute")
+        attr, meta_type = _META[kind]
+        meta = getattr(cls, attr, None)
+        if not isinstance(meta, meta_type):
+            raise RegistryError(
+                f"{cls.__qualname__}.{attr} must be a {meta_type.__name__} instance, "
+                f"got {type(meta).__name__}"
+            )
         if params is not None and not (isinstance(params, type) and issubclass(params, BaseModel)):
             raise RegistryError(f"params for {id!r} must be a pydantic BaseModel subclass")
+        if params is not None and params.model_config.get("extra") != "forbid":
+            raise RegistryError(
+                f"params model {params.__qualname__} for {id!r} must set extra='forbid' "
+                "(typos in params must fail, not be ignored)"
+            )
         existing = self._entries[kind].get(id)
         if existing is not None:
-            if existing.cls is cls:
+            # Same class re-imported (importlib.reload, module imported under two names)
+            # yields a new class object, so identity is the wrong test.
+            if _class_key(existing.cls) == _class_key(cls):
                 return
             raise DuplicateIdError(
                 f"{kind} {id!r} already registered by {existing.cls.__qualname__}"
             )
-        self._entries[kind][id] = Entry(kind, id, cls, cls.metadata, params)
+        self._entries[kind][id] = Entry(kind, id, cls, meta, params)
 
     def get(self, kind: Kind, id: str) -> Entry:
         try:
@@ -101,6 +126,10 @@ class Registry:
         return [
             e for e in self.entries("environment") if _supports(meta, e.metadata.action_space_kind)
         ]
+
+
+def _class_key(cls: type) -> tuple[str, str]:
+    return cls.__module__, cls.__qualname__
 
 
 def _supports(controller_meta: Any, kind: str) -> bool:
@@ -150,19 +179,31 @@ def register_controller(
 
 
 def discover(packages: Collection[str] = ("rcl.environments", "rcl.controllers")) -> None:
-    """Import every module under ``packages`` (recursively) so their decorators run."""
+    """Import every module under ``packages`` (recursively) so their decorators run.
+
+    A module that fails to import raises ``RegistryError`` naming that module (not just the
+    package), chaining the original error.
+    """
     for name in packages:
-        try:
-            pkg = importlib.import_module(name)
-            paths = getattr(pkg, "__path__", None)
-            if paths is None:
-                continue
-            for mod in pkgutil.walk_packages(paths, prefix=f"{name}.", onerror=_raise):
-                importlib.import_module(mod.name)
-        except RegistryError:
-            raise
-        except Exception as exc:
-            raise RegistryError(f"discovery failed in {name!r}: {exc!r}") from exc
+        for mod_name in _module_names(name):
+            try:
+                importlib.import_module(mod_name)
+            except RegistryError:
+                raise
+            except Exception as exc:
+                raise RegistryError(f"discovery failed importing {mod_name!r}: {exc!r}") from exc
+
+
+def _module_names(package: str) -> list[str]:
+    try:
+        pkg = importlib.import_module(package)
+        paths = getattr(pkg, "__path__", None)
+        if paths is None:
+            return [package]
+        found = pkgutil.walk_packages(paths, prefix=f"{package}.", onerror=_raise)
+        return [package, *(m.name for m in found)]
+    except Exception as exc:
+        raise RegistryError(f"discovery failed in {package!r}: {exc!r}") from exc
 
 
 def _raise(name: str) -> None:

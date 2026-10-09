@@ -6,8 +6,8 @@ Each metric is a pure function `metric(traj: EpisodeTrajectory, task: TaskSpec) 
 
 An `EpisodeTrajectory` has samples `k = 0..N-1` at fixed step `dt` (s), time `t_k = k*dt`, and per step: true state `x_k` (`env.get_state()`), applied action `u_k` (physical units; discrete actions are mapped to their applied value by the environment), reward `r_k`, plus flags `terminated`, `truncated`. `TaskSpec` supplies:
 
-- `y(x)`: the controlled output (e.g. pole angle in rad) and `y_ref`: its setpoint.
-- `T_max = time_limit` (s) and `angle_wrap` (true for angular outputs).
+- `y(x) = x[error_state_index]`: the controlled output (e.g. pole angle in rad) and `y_ref = setpoint[error_state_index]`: its reference (derived, not stored separately).
+- `T_max = horizon_steps * dt` (s; there is no separate time-limit field) and `angle_wrap` (default false; true for angular outputs).
 - `step_floor` (`S_min`): smallest step size treated as a real step response.
 
 Error `e_k = wrap(y(x_k) - y_ref)`, where `wrap` maps to (-pi, pi] for angles and is the identity otherwise. Step size `S = |y_ref - y(x_0)|`. Episode duration `T = N*dt`.

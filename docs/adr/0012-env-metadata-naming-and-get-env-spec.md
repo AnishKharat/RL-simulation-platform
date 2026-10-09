@@ -1,6 +1,6 @@
 # 0012. `env_metadata` naming vs gym `metadata`, and `get_env_spec`
 
-- Status: Accepted (naming); registry code alignment pending
+- Status: Accepted (naming); registry reads `env_metadata` for environments with an isinstance check (review 1, R1)
 - Date: 2026-10-10
 
 ## Context
@@ -21,8 +21,8 @@ Controllers have no such clash. Separately, controllers need a runtime descripti
 ## Consequences
 - No accidental overwrite of gym render metadata; both can coexist on one class.
 - Asymmetric attribute names (`env_metadata` vs `metadata`) must be handled in the registry.
-- `docs/architecture/registry.md` and `rcl/registry/registry.py` currently read `cls.metadata` for both kinds;
-  the registry must be updated to read `env_metadata` for environments (follow-up, outside this ADR).
+- Done in review 1: `rcl/registry/registry.py` reads `env_metadata` (environments) / `metadata` (controllers) and
+  rejects classes whose attribute is not an `EnvMetadata` / `ControllerMetadata` instance.
 
 ## Alternatives
 - Overload gym `metadata` with our keys: mixes concerns, risks breaking render tooling.

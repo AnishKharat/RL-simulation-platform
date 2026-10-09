@@ -29,7 +29,7 @@ class BaseEnvironment(gym.Env[Any, Any], ABC):
     * `get_state()` returns the TRUE state (not the possibly noisy/partial observation),
       shape `(EnvSpec.state_dim,)`, used by metrics and model-based controllers.
     * `get_linearization()` is an optional capability; the default returns None.
-    * Environments import only `rcl.core`; perturbations are implemented as wrappers.
+    * Environments import only `rcl.core`; perturbations are implemented as `EnvWrapper`s.
     * `render()`/`close()` follow Gymnasium semantics; `close()` must be idempotent.
     """
 
@@ -50,3 +50,42 @@ class BaseEnvironment(gym.Env[Any, Any], ABC):
     def get_linearization(self) -> LinearModel | None:
         """Return the linearisation about the task equilibrium, or None if unsupported."""
         return None
+
+
+class EnvWrapper(BaseEnvironment, gym.Wrapper[Any, Any, Any, Any]):
+    """Base class for perturbation/noise wrappers around a `BaseEnvironment` (Phase 4).
+
+    Contract
+    --------
+    * Wraps a `BaseEnvironment` and is itself a `BaseEnvironment`, so controllers, the
+      rollout and metrics cannot tell it apart. `reset`/`step`/`render`/`close` follow
+      `gymnasium.Wrapper` (delegation); subclasses override `step`/`reset` to perturb.
+    * `get_state()` returns the TRUE, UNPERTURBED state of the wrapped environment (sensor
+      noise and disturbances act on observations/actions only), so metrics stay comparable
+      across perturbation levels.
+    * `get_task_spec`, `get_env_spec`, `get_linearization` delegate unchanged.
+    * `env_metadata` delegates to the wrapped environment and is available on INSTANCES only
+      (a wrapper has no class-level metadata of its own).
+    """
+
+    def __init__(self, env: BaseEnvironment) -> None:
+        if not isinstance(env, BaseEnvironment):
+            raise TypeError("EnvWrapper can only wrap a BaseEnvironment")
+        super().__init__(env)
+        self._inner = env  # typed handle; gym.Wrapper.env is typed as plain gym.Env
+
+    @property
+    def env_metadata(self) -> EnvMetadata:  # type: ignore[override]  # ClassVar -> instance property
+        return self._inner.env_metadata
+
+    def get_env_spec(self) -> EnvSpec:
+        return self._inner.get_env_spec()
+
+    def get_state(self) -> np.ndarray:
+        return self._inner.get_state()
+
+    def get_task_spec(self) -> TaskSpec:
+        return self._inner.get_task_spec()
+
+    def get_linearization(self) -> LinearModel | None:
+        return self._inner.get_linearization()

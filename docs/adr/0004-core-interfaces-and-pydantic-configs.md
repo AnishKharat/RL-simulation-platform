@@ -17,7 +17,7 @@ experiment config schema. It imports nothing from `rcl` (third-party `gymnasium`
 - `ExperimentConfig` (`name`, `seed`, `environment`, `controller`, optional `training`, `evaluation`) is the single
   source of truth for a run; `ComponentConfig.params` stays a plain dict and is validated later against the
   registry entry's param model, because core cannot know concrete schemas.
-- `RunRecord` (seed, config, library versions, code version) lives in core as the reproducibility block (ADR 0010).
+- `RunRecord` (seed, derived_seeds, config, config_hash, versions, code_version) lives in core as the reproducibility block (ADR 0010).
 - No stores, no registry, no behaviour beyond validation.
 
 ## Consequences
@@ -30,3 +30,8 @@ experiment config schema. It imports nothing from `rcl` (third-party `gymnasium`
 - Dataclasses everywhere: no JSON schema or coercion for free.
 - Pydantic for trajectories: copying/validation overhead on large arrays.
 - Typed per-component config unions in core: would make core know every robot.
+
+## Revisions (architecture review 1)
+- `EnvSpec` validates its action fields at construction: DISCRETE needs `n_actions` and no bounds; CONTINUOUS needs equal-length `action_low/high` (low <= high, length = prod(action_shape) when given) and no `n_actions`.
+- `core.environment.EnvWrapper(BaseEnvironment, gymnasium.Wrapper)` is the base for Phase 4 perturbation wrappers: it delegates all benchmarking hooks, and `get_state()` returns the true unperturbed state.
+- `EnvMetadata` and `ControllerMetadata` gain a required `version`; `ExperimentConfig.config_hash()` excludes `seed` and `name` (ADR 0009/0010).

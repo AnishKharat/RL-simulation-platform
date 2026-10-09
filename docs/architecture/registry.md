@@ -1,6 +1,6 @@
 # Registry design (Phase 0)
 
-Status: proposed. Code: `rcl/registry/`. Spec source: `project_context.md` 5.3.
+Status: accepted (architecture review 1). Code: `rcl/registry/`. Spec source: `project_context.md` 5.3.
 
 ## 1. Import-rule decision
 
@@ -14,9 +14,8 @@ the JSON-schema export are behaviour, not types. (b) would make `core` hold glob
 logic, and the registry module would then be an empty facade. (a) costs one allowed edge, which keeps layering
 downward-only: `experiments/api -> environments|controllers -> registry -> core`. Registry never imports
 env/controller modules statically; it loads them by name via `importlib` (discovery), so no cycle exists.
-Enforced in `pyproject.toml`: the `registry` layer now sits between `environments|controllers` and `core`, and a new
-contract says registry imports only core. `project_context.md` 4 needs the matching one-line edit
-("environments and controllers import only `core` and `registry`"); that file is not mine to edit.
+Enforced in `pyproject.toml`: the `registry` layer sits between `environments|controllers` and `core`, and a
+contract says registry imports only core. `project_context.md` section 4 states the same rule.
 
 ## 2. Decorator API
 
@@ -30,20 +29,19 @@ class PID(BaseController): ...
 ```
 
 The decorator returns the class unchanged. Validation happens at decoration time (fail at import, not at run time):
-id matches `^[a-z][a-z0-9_]*$`; class has a `metadata` attribute; `params` (if given) is a `BaseModel` subclass.
-Violations raise `RegistryError`.
+id matches `^[a-z][a-z0-9_]*$`; the class has the metadata attribute, of the right type (environments: `cls.env_metadata` must be an `EnvMetadata`; controllers: `cls.metadata` must be a `ControllerMetadata`, checked with `isinstance`, so gymnasium's own `metadata` dict can never be mistaken for it, ADR 0012); `params` (if given) is a `BaseModel` subclass with `extra="forbid"` (a typo in a param must fail, not be ignored).
+Violations raise `RegistryError` (a duplicate id raises `DuplicateIdError`).
 
 ## 3. Entry contents
 
-`Entry(kind, id, cls, metadata, params_model)`; `metadata` is `cls.metadata` (core's `EnvMetadata` /
-`ControllerMetadata`). `Entry.info()` returns the API-facing dict:
+`Entry(kind, id, cls, metadata, params_model)`; `metadata` is `cls.env_metadata` for environments and `cls.metadata` for controllers (core's `EnvMetadata` /
+`ControllerMetadata`). `requires_training` is part of `ControllerMetadata` (no class attribute), so it appears in `info()["metadata"]`. Training hyperparameters live in the controller's own `params` model (one schema per controller); `TrainConfig` / `TrainingSection` carry only the budget (`total_timesteps`) and seed. `Entry.info()` returns the API-facing dict:
 `{id, kind, metadata: <model_dump>, params_schema: params_model.model_json_schema() or {}}` so the frontend renders
-forms from `params_schema` with no per-robot code. `Registry.entries(kind)` lists; `Entry.validate_params(raw)` validates through the model.
+forms from `params_schema` with no per-robot code. `Registry.entries(kind)` lists; `Entry.validate_params(raw)` validates through the model and returns the RESOLVED params (defaults filled, `model_dump(mode="json")`); those, not the raw input, are what the experiment manager stores and hashes. An entry without a params model accepts only `{}`.
 
-**Needed from core** (registry only reads these structurally, via Protocols):
-- `EnvMetadata.action_space_kind: Literal["discrete", "continuous"]`
-- `ControllerMetadata.supported_action_spaces: Collection[Literal["discrete", "continuous"]]`
-- both are Pydantic models (or at least expose `model_dump()`), and classes expose them as class attribute `metadata`.
+**Single source of truth for parameters:** `EnvMetadata` and `ControllerMetadata` carry no `params_schema` / `default_params`. The JSON schema and defaults come only from the Pydantic params model passed to the decorator.
+
+**From core:** the registry imports `EnvMetadata` / `ControllerMetadata` from `rcl.core.types` (allowed edge registry -> core) and reads `action_space_kind` (env) and `supported_action_spaces` (controller) from them directly.
 
 ## 4. Compatibility filtering
 
@@ -56,7 +54,7 @@ both so the dropdown filters from registry data only.
 `discover(packages=("rcl.environments", "rcl.controllers"))` walks each package with `pkgutil.walk_packages` and
 imports every module; importing runs the decorators. Subpackages (`controllers.classical`, `controllers.rl`) are
 covered by the recursive walk. Idempotent (Python caches imports). A module that fails to import raises
-`RegistryError` naming the module and chaining the cause: a broken robot file is loud, not silently missing.
+`RegistryError` naming that module (not only the package) and chaining the cause: a broken robot file is loud, not silently missing.
 Optional heavy deps (SB3) are the module's problem: lazy-import them inside methods, not at top level.
 Called once by the API/experiment manager at startup, never from the registry import itself.
 
@@ -64,7 +62,7 @@ Called once by the API/experiment manager at startup, never from the registry im
 
 | Situation | Behaviour |
 |---|---|
-| Duplicate id within a kind | `DuplicateIdError` at decoration (same class object re-registered is a no-op) |
+| Duplicate id within a kind | `DuplicateIdError` at decoration (the same class re-registered, compared by `__module__` + `__qualname__` so a reloaded module is fine, is a no-op) |
 | Same id across kinds | allowed (kinds are separate namespaces) |
 | Bad id / missing metadata / non-Pydantic params | `RegistryError` at decoration |
 | Unknown id on lookup | `UnknownIdError` (a `KeyError` subclass) listing known ids |
