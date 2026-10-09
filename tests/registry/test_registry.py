@@ -212,6 +212,6 @@ def test_discovery_reports_broken_module(
 ) -> None:
     _write_pkg(tmp_path, "fx_broken", {"boom": "import does_not_exist_xyz\n"})
     monkeypatch.syspath_prepend(str(tmp_path))
-    with pytest.raises(RegistryError, match="fx_broken"):
+    with pytest.raises(RegistryError, match="fx_broken.boom"):
         discover(["fx_broken"])
     sys.modules.pop("fx_broken", None)

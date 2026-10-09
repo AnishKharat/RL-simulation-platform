@@ -170,19 +170,31 @@ def register_controller(
 
 
 def discover(packages: Collection[str] = ("rcl.environments", "rcl.controllers")) -> None:
-    """Import every module under ``packages`` (recursively) so their decorators run."""
+    """Import every module under ``packages`` (recursively) so their decorators run.
+
+    A module that fails to import raises ``RegistryError`` naming that module (not just the
+    package), chaining the original error.
+    """
     for name in packages:
-        try:
-            pkg = importlib.import_module(name)
-            paths = getattr(pkg, "__path__", None)
-            if paths is None:
-                continue
-            for mod in pkgutil.walk_packages(paths, prefix=f"{name}.", onerror=_raise):
-                importlib.import_module(mod.name)
-        except RegistryError:
-            raise
-        except Exception as exc:
-            raise RegistryError(f"discovery failed in {name!r}: {exc!r}") from exc
+        for mod_name in _module_names(name):
+            try:
+                importlib.import_module(mod_name)
+            except RegistryError:
+                raise
+            except Exception as exc:
+                raise RegistryError(f"discovery failed importing {mod_name!r}: {exc!r}") from exc
+
+
+def _module_names(package: str) -> list[str]:
+    try:
+        pkg = importlib.import_module(package)
+        paths = getattr(pkg, "__path__", None)
+        if paths is None:
+            return [package]
+        found = pkgutil.walk_packages(paths, prefix=f"{package}.", onerror=_raise)
+        return [package, *(m.name for m in found)]
+    except Exception as exc:
+        raise RegistryError(f"discovery failed in {package!r}: {exc!r}") from exc
 
 
 def _raise(name: str) -> None:
