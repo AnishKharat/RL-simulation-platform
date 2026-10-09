@@ -19,7 +19,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 ---
 
 ## Phase 0 — Architecture
-- ☐ Repo scaffold: `pyproject.toml`, folder structure, `.gitignore`, pre-commit config
+- ☑ Repo scaffold: `pyproject.toml`, folder structure, `.gitignore`, pre-commit config
 - ☐ CI workflow (lint + tests)
 - ☐ Component architecture diagram
 - ☐ "Run experiment" sequence diagram
