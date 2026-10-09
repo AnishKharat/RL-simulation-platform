@@ -6,12 +6,13 @@ Array-carrying types are frozen dataclasses that validate their shape invariants
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ActionSpaceKind(StrEnum):
@@ -51,7 +52,8 @@ class EnvSpec(_Spec):
 
     Contract: shapes/bounds are those of the instance's gymnasium spaces; `dt` is the control
     period in seconds. `n_actions` is set iff `action_space_kind` is DISCRETE;
-    `action_low/high` are set iff CONTINUOUS.
+    `action_low/high` are set iff CONTINUOUS, with equal lengths (= prod(action_shape) when
+    `action_shape` is given) and low <= high. Violations raise at construction.
     """
 
     env_id: str
@@ -63,6 +65,26 @@ class EnvSpec(_Spec):
     n_actions: int | None = Field(default=None, ge=2)
     action_low: tuple[float, ...] | None = None
     action_high: tuple[float, ...] | None = None
+
+    @model_validator(mode="after")
+    def _check_action_fields(self) -> EnvSpec:
+        if self.action_space_kind is ActionSpaceKind.DISCRETE:
+            if (
+                self.n_actions is None
+                or self.action_low is not None
+                or self.action_high is not None
+            ):
+                raise ValueError("DISCRETE requires n_actions and forbids action_low/action_high")
+            return self
+        if self.n_actions is not None or self.action_low is None or self.action_high is None:
+            raise ValueError("CONTINUOUS requires action_low/action_high and forbids n_actions")
+        if len(self.action_low) != len(self.action_high):
+            raise ValueError("action_low and action_high must have equal length")
+        if any(lo > hi for lo, hi in zip(self.action_low, self.action_high, strict=True)):
+            raise ValueError("action_low must be <= action_high element-wise")
+        if self.action_shape and len(self.action_low) != math.prod(self.action_shape):
+            raise ValueError("action_low/high length must equal prod(action_shape)")
+        return self
 
 
 class ControllerMetadata(_Spec):

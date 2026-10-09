@@ -30,3 +30,6 @@ experiment config schema. It imports nothing from `rcl` (third-party `gymnasium`
 - Dataclasses everywhere: no JSON schema or coercion for free.
 - Pydantic for trajectories: copying/validation overhead on large arrays.
 - Typed per-component config unions in core: would make core know every robot.
+
+## Revisions (architecture review 1)
+- `EnvSpec` validates its action fields at construction: DISCRETE needs `n_actions` and no bounds; CONTINUOUS needs equal-length `action_low/high` (low <= high, length = prod(action_shape) when given) and no `n_actions`.

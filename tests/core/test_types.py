@@ -98,3 +98,39 @@ def test_metadata_and_specs_round_trip() -> None:
         horizon_steps=10,
     )
     assert TaskSpec.model_validate_json(ts.model_dump_json()) == ts
+
+
+_ES: dict[str, Any] = {"env_id": "e", "obs_shape": (2,), "state_dim": 2, "dt": 0.1}
+
+
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {"action_space_kind": "discrete"},
+        {"action_space_kind": "discrete", "n_actions": 2, "action_low": (0.0,)},
+        {"action_space_kind": "continuous"},
+        {
+            "action_space_kind": "continuous",
+            "n_actions": 2,
+            "action_low": (0,),
+            "action_high": (1,),
+        },
+        {"action_space_kind": "continuous", "action_low": (0.0,), "action_high": (1.0, 2.0)},
+        {"action_space_kind": "continuous", "action_low": (1.0,), "action_high": (0.0,)},
+        {
+            "action_space_kind": "continuous",
+            "action_shape": (2,),
+            "action_low": (0.0,),
+            "action_high": (1.0,),
+        },
+    ],
+)
+def test_env_spec_action_invariants(kw: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError):
+        EnvSpec(**_ES, **kw)
+
+
+def test_env_spec_valid_continuous() -> None:
+    EnvSpec(
+        **_ES, action_space_kind="continuous", action_shape=(1,), action_low=(-1,), action_high=(1,)
+    )
