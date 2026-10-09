@@ -14,7 +14,7 @@ fastapi 0.143.0, starlette 1.7.0, uvicorn 0.54.0, httpx 0.28.1, pydantic 2.14.0.
 - 4096 PPO steps on CPU: ~4.6 s (includes torch import warm-up). 4k steps does not learn the
   task (return -612 vs PID -0.11); fine for a pipeline check, so real training needs 100k+.
 - A PID controller runs on the same env via the same `obs -> action` callable as
-  `model.predict(obs, deterministic=True)[0]`. Suggests the `BaseController.act(obs)` contract
+  `model.predict(obs, deterministic=True)[0]`. Suggests the `BaseController.predict(obs)` contract
   can serve both classical and RL controllers; the RL one is a thin wrapper around a loaded model.
 - Reproducibility: same env seed -> bit-identical trajectory; same train seed + same versions ->
   bit-identical policy and rollout (CPU only). Save/load (`model.save`/`PPO.load(device="cpu")`)

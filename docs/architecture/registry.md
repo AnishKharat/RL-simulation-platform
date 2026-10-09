@@ -1,6 +1,6 @@
 # Registry design (Phase 0)
 
-Status: proposed. Code: `rcl/registry/`. Spec source: `project_context.md` 5.3.
+Status: accepted (architecture review 1). Code: `rcl/registry/`. Spec source: `project_context.md` 5.3.
 
 ## 1. Import-rule decision
 
@@ -14,9 +14,8 @@ the JSON-schema export are behaviour, not types. (b) would make `core` hold glob
 logic, and the registry module would then be an empty facade. (a) costs one allowed edge, which keeps layering
 downward-only: `experiments/api -> environments|controllers -> registry -> core`. Registry never imports
 env/controller modules statically; it loads them by name via `importlib` (discovery), so no cycle exists.
-Enforced in `pyproject.toml`: the `registry` layer now sits between `environments|controllers` and `core`, and a new
-contract says registry imports only core. `project_context.md` 4 needs the matching one-line edit
-("environments and controllers import only `core` and `registry`"); that file is not mine to edit.
+Enforced in `pyproject.toml`: the `registry` layer sits between `environments|controllers` and `core`, and a
+contract says registry imports only core. `project_context.md` section 4 states the same rule.
 
 ## 2. Decorator API
 
@@ -31,7 +30,7 @@ class PID(BaseController): ...
 
 The decorator returns the class unchanged. Validation happens at decoration time (fail at import, not at run time):
 id matches `^[a-z][a-z0-9_]*$`; the class has the metadata attribute, of the right type (environments: `cls.env_metadata` must be an `EnvMetadata`; controllers: `cls.metadata` must be a `ControllerMetadata`, checked with `isinstance`, so gymnasium's own `metadata` dict can never be mistaken for it, ADR 0012); `params` (if given) is a `BaseModel` subclass with `extra="forbid"` (a typo in a param must fail, not be ignored).
-Violations raise `RegistryError`.
+Violations raise `RegistryError` (a duplicate id raises `DuplicateIdError`).
 
 ## 3. Entry contents
 
@@ -55,7 +54,7 @@ both so the dropdown filters from registry data only.
 `discover(packages=("rcl.environments", "rcl.controllers"))` walks each package with `pkgutil.walk_packages` and
 imports every module; importing runs the decorators. Subpackages (`controllers.classical`, `controllers.rl`) are
 covered by the recursive walk. Idempotent (Python caches imports). A module that fails to import raises
-`RegistryError` naming the module and chaining the cause: a broken robot file is loud, not silently missing.
+`RegistryError` naming that module (not only the package) and chaining the cause: a broken robot file is loud, not silently missing.
 Optional heavy deps (SB3) are the module's problem: lazy-import them inside methods, not at top level.
 Called once by the API/experiment manager at startup, never from the registry import itself.
 

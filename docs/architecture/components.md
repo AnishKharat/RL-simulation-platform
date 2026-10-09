@@ -44,8 +44,8 @@ flowchart TD
     ANA --> CORE
     ENV --> CORE
     CTL --> CORE
-    ENV -. "decorator only (OQ-1)" .-> REG
-    CTL -. "decorator only (OQ-1)" .-> REG
+    ENV -. "decorator only" .-> REG
+    CTL -. "decorator only" .-> REG
     MET --> CORE
     PST --> CORE
     REG --> CORE
@@ -54,7 +54,7 @@ flowchart TD
     ENV -.-> PHY
 ```
 
-Dashed edges are special. The frontend edge is a network call, not an import. The `ENV/CTL -> registry` edges are provisional resolution (a) of the open question in `docs/OPEN_QUESTIONS.md`; if resolution (b) wins (decorator lives in `core`), they disappear. `analytics -> metrics/persistence/core` is not stated in §4; it is inferred and encoded in the layers contract (see end of file). Environments and controllers are discovered by the registry at runtime (package scan), not imported by it.
+Dashed edges are special. The frontend edge is a network call, not an import. The `ENV/CTL -> registry` edges are resolution (a) of the former open question (decided in architecture review 1, ADR 0003). `analytics -> metrics/persistence/core` is not stated in §4; it is inferred and encoded in the layers contract (see end of file). Environments and controllers are discovered by the registry at runtime (package scan), not imported by it.
 
 ## Responsibilities
 

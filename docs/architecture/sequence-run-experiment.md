@@ -44,15 +44,15 @@ sequenceDiagram
     W->>EM: execute(run_id)
     EM->>DB: load config
     EM->>EM: record versions (python, libs, git sha)
-    EM->>REG: get_environment(env.id), get_controller(ctl.id)
-    REG-->>EM: classes + parameter schemas
-    EM->>EM: validate params against schemas, check action-space compatibility
+    EM->>REG: get("environment", env.id), get("controller", ctl.id)
+    REG-->>EM: Entry (cls, metadata, params_model)
+    EM->>EM: entry.validate_params(raw) -> resolved params, check action-space compatibility
     EM->>EM: derive seeds from experiment.seed
-    EM->>ENV: create(params)
-    EM->>CTL: configure(env_spec, params)
+    EM->>ENV: cls(**validated_params)
+    EM->>CTL: cls(), then configure(env_spec, validated_params)
 
     opt controller metadata requires_training
-        EM->>CTL: train(env, TrainConfig, seed)
+        EM->>CTL: train(env, TrainConfig)
         CTL->>ENV: reset(seed) / step(action) ...
         CTL-->>EM: TrainResult (curves, checkpoint)
         EM->>DB: save training artifact refs
@@ -99,7 +99,7 @@ sequenceDiagram
     participant FE as Frontend
 
     W->>EM: execute(run_id)
-    EM->>CTL: train / evaluate
+    EM->>CTL: train / predict (rollout)
     CTL--xEM: exception (NaN loss, env error, bad params)
     EM->>EM: close env, release resources
     EM->>DB: status = failed, error, stage, finished_at

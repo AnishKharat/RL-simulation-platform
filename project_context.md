@@ -78,7 +78,8 @@ rcl/
 
 **Dependency rules**
 - `core` imports nothing from the project.
-- `environments` and `controllers` import only `core` (+ third-party).
+- `environments` and `controllers` import only `core` and `registry` (the registration decorator) (+ third-party).
+- `registry` imports only `core`; it loads environments/controllers by name (discovery), never statically.
 - `experiments` imports `core`, `registry`, `metrics`, `persistence`.
 - `api` imports `experiments`, `analytics`, `registry`, `persistence`.
 - `frontend` talks to `api` only (HTTP), never imports backend internals.

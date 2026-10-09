@@ -1,6 +1,6 @@
 # 0003. Decorator registry, pkgutil discovery, registry import rule
 
-- Status: Accepted (design); import rule is option (a), listed in `docs/OPEN_QUESTIONS.md` pending review
+- Status: Accepted (design and import rule (a), settled in architecture review 1; see `docs/OPEN_QUESTIONS.md`)
 - Date: 2026-10-10
 
 ## Context
@@ -22,8 +22,7 @@ Full design: `docs/architecture/registry.md`.
 - The default `Registry` instance is the only global state; tests swap it with `use_registry(Registry())`.
 
 ## Consequences
-- One allowed extra edge; `project_context.md` section 4 needs the matching wording (env/controllers import
-  `core` and `registry`). `pyproject.toml` already encodes it (ADR 0011).
+- One allowed extra edge; `project_context.md` section 4 and `pyproject.toml` (ADR 0011) both state it.
 - Optional heavy dependencies (SB3/torch) must be lazy-imported inside methods so discovery stays fast.
 - Duplicate ids fail at import time, which makes broken plugins visible at startup.
 
