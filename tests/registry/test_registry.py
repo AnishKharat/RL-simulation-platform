@@ -1,11 +1,13 @@
+import json
 import sys
 import textwrap
+from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pytest
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
 from rcl.core.controller import Action, BaseController
 from rcl.core.environment import BaseEnvironment
@@ -19,6 +21,7 @@ from rcl.core.types import (
 )
 from rcl.registry import (
     DuplicateIdError,
+    ParamValidationError,
     Registry,
     RegistryError,
     UnknownIdError,
@@ -85,7 +88,7 @@ def test_register_lookup_and_info(reg: Registry) -> None:
     assert "params_schema" not in info["metadata"]  # schema comes from the params model only
     # resolved params: defaults filled, JSON-safe (tuple -> list)
     assert entry.validate_params({"kp": 2}) == {"kp": 2.0, "gains": [0.0, 1.0]}
-    with pytest.raises(ValidationError):
+    with pytest.raises(ParamValidationError):
         entry.validate_params({"kd": 1})
     assert get_registry() is reg
 
@@ -294,3 +297,74 @@ def test_discovery_packages_constant_matches_import_linter_contracts() -> None:
     independent = next(c for c in contracts.values() if c["type"] == "independence")["modules"]
     assert set(DISCOVERY_PACKAGES) == set(independent) == {m.strip() for m in tier.split("|")}
     discover()  # default scan imports every plugin package, including the empty ones
+
+
+def test_param_validation_error_shape(reg: Registry) -> None:
+    register_controller("pid", params=Params)(type("C", (), {"metadata": _ctl_meta()}))
+    entry = reg.get("controller", "pid")
+    with pytest.raises(ParamValidationError) as exc:
+        entry.validate_params({"kp": "abc", "kd": 1, "gains": [1.0]})
+    errs = exc.value.errors
+    assert {tuple(e["loc"]) for e in errs} == {("kp",), ("kd",), ("gains", 1)}
+    for e in errs:
+        assert set(e) == {"loc", "msg", "type"} and isinstance(e["loc"], list)
+        assert isinstance(e["msg"], str) and isinstance(e["type"], str)
+    assert isinstance(exc.value, ValueError)
+    json.dumps(errs)  # API-ready
+    reg.register("environment", "plain", _env_cls())
+    with pytest.raises(ParamValidationError) as exc2:
+        reg.get("environment", "plain").validate_params({"x": 1})
+    assert exc2.value.errors == [
+        {"loc": ["x"], "msg": "no params accepted", "type": "extra_forbidden"}
+    ]
+
+
+class _Mode(Enum):
+    A = "a"
+    B = "b"
+
+
+class _Inner(BaseModel):
+    x: int = 0
+
+
+class _GoodRich(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mode: _Mode = _Mode.A
+    kind: Literal["p", "q"] = "p"
+    n: int | None = Field(default=None, ge=1, le=10)
+    gains: tuple[float, float, float] = (1.0, 0.0, 0.0)
+    names: list[str] = []
+    flag: bool = False
+
+
+class _NestedParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    inner: _Inner = _Inner()
+
+
+class _ListOfObjects(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[_Inner] = []
+
+
+class _DictParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    extra_map: dict[str, float] = {}
+
+
+class _NestedArray(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    m: list[list[float]] = []
+
+
+def test_param_subset_accepts_scalars_enums_tuples(reg: Registry) -> None:
+    register_controller("rich", params=_GoodRich)(_ctl_cls())
+    assert reg.get("controller", "rich").validate_params({"mode": "b"})["mode"] == "b"
+
+
+@pytest.mark.parametrize("model", [_NestedParams, _ListOfObjects, _DictParams, _NestedArray])
+def test_param_subset_rejects_nested_objects_and_refs(reg: Registry, model: type) -> None:
+    with pytest.raises(RegistryError, match="supported subset"):
+        register_controller("bad", params=model)(_ctl_cls())
+    assert reg.entries("controller") == []

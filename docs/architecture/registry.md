@@ -39,6 +39,10 @@ Violations raise `RegistryError` (a duplicate id raises `DuplicateIdError`).
 `{id, kind, metadata: <model_dump>, params_schema: params_model.model_json_schema() or {}}` so the frontend renders
 forms from `params_schema` with no per-robot code. `Registry.entries(kind)` lists; `Entry.validate_params(raw)` validates through the model and returns the RESOLVED params (defaults filled, `model_dump(mode="json")`); those, not the raw input, are what the experiment manager stores and hashes. An entry without a params model accepts only `{}`.
 
+**Supported params subset (checked at register time):** every field of a params model must be a scalar (`str`, `int`, `float`, `bool`), an `Enum`/`Literal`, an optional (`X | None`) of those, or a tuple/list of numbers or strings (use `Field(ge=, le=, ...)` constraints; they reach the JSON schema and become form limits). Nested models, dicts, lists of objects and nested arrays raise `RegistryError` at decoration: the frontend renders forms from the schema and has no generic object editor, so the subset is what keeps "no per-robot frontend code" true.
+
+**Param errors:** `Entry.validate_params` wraps pydantic's `ValidationError` into `ParamValidationError` (a `RegistryError` and `ValueError`) whose `.errors` is a JSON-safe list of `{loc, msg, type}` (`loc` a list of field path parts), which the API returns as its 422 body, so the frontend can mark the offending fields.
+
 **Single source of truth for parameters:** `EnvMetadata` and `ControllerMetadata` carry no `params_schema` / `default_params`. The JSON schema and defaults come only from the Pydantic params model passed to the decorator.
 
 **From core:** the registry imports `EnvMetadata` / `ControllerMetadata` from `rcl.core.types` (allowed edge registry -> core) and reads `action_space_kind` (env) and `supported_action_spaces` (controller) from them directly.
