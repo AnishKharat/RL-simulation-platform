@@ -80,7 +80,7 @@ Dashed edges are special. The frontend edge is a network call, not an import. Th
 
 ## Where later modules slot in
 
-- **perturbations (Phase 4):** env wrappers (`gymnasium.Wrapper` over `BaseEnvironment`) for disturbances, sensor noise, wind, mass variation. They import `core` only and are selected through the experiment config (a `perturbations:` list resolved by the experiment manager), so no environment or controller changes. Robustness metrics (failure count, recovery time) are added to `metrics`.
+- **perturbations (Phase 4):** env wrappers (subclasses of `rcl.core.environment.EnvWrapper`, a `BaseEnvironment` + `gymnasium.Wrapper` that delegates `get_state` (true, unperturbed state), `get_task_spec`, `get_env_spec`, `env_metadata`, `get_linearization`) for disturbances, sensor noise, wind, mass variation. They import `core` only and are selected through the experiment config (a `perturbations:` list resolved by the experiment manager), so no environment or controller changes. Robustness metrics (failure count, recovery time) are added to `metrics`.
 - **ros_adapter (Phase 7):** another `BaseEnvironment` implementation that bridges to ROS2 hardware. It lives beside `environments`, imports `core` only, and registers like any robot, so controllers and the manager are unchanged. Policy export and a safety-limits layer sit in this package.
 - **PhysicsBackend (Phase 3+):** an interface (in `core`) that an environment uses internally to step a simulation; Gymnasium-native, PyBullet, and later MuJoCo implement it. It is chosen via `EnvMetadata.physics_backend`, invisible to controllers, and is the bottom of the layer stack in principle 6.
 

@@ -33,3 +33,4 @@ experiment config schema. It imports nothing from `rcl` (third-party `gymnasium`
 
 ## Revisions (architecture review 1)
 - `EnvSpec` validates its action fields at construction: DISCRETE needs `n_actions` and no bounds; CONTINUOUS needs equal-length `action_low/high` (low <= high, length = prod(action_shape) when given) and no `n_actions`.
+- `core.environment.EnvWrapper(BaseEnvironment, gymnasium.Wrapper)` is the base for Phase 4 perturbation wrappers: it delegates all benchmarking hooks, and `get_state()` returns the true unperturbed state.

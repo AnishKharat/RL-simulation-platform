@@ -4,7 +4,7 @@ import gymnasium as gym
 import numpy as np
 import pytest
 
-from rcl.core.environment import BaseEnvironment
+from rcl.core.environment import BaseEnvironment, EnvWrapper
 from rcl.core.types import ActionSpaceKind, EnvMetadata, EnvSpec, TaskSpec
 
 
@@ -36,6 +36,9 @@ class _Dummy(BaseEnvironment):
             obs_shape=(1,),
             state_dim=1,
             dt=0.1,
+            action_shape=(1,),
+            action_low=(-1.0,),
+            action_high=(1.0,),
         )
 
     def get_state(self) -> np.ndarray:
@@ -58,3 +61,30 @@ def test_concrete_subclass_defaults() -> None:
     first = env.np_random.random()
     env.reset(seed=3)
     assert env.np_random.random() == first
+
+
+class _Offset(EnvWrapper):
+    """Perturbs observations only."""
+
+    def step(self, action: Any) -> Any:
+        obs, r, term, trunc, info = self.env.step(action)
+        return obs + 1.0, r, term, trunc, info
+
+
+def test_env_wrapper_delegates_and_keeps_true_state() -> None:
+    inner = _Dummy()
+    w = _Offset(inner)
+    assert isinstance(w, BaseEnvironment)
+    assert w.env_metadata is _Dummy.env_metadata
+    assert w.get_env_spec() == inner.get_env_spec()
+    assert w.get_task_spec() == inner.get_task_spec()
+    assert w.get_linearization() is None
+    w.reset(seed=1)
+    obs, *_ = w.step(np.zeros(1))
+    assert obs[0] == 1.0  # perturbed observation
+    assert w.get_state()[0] == 0.0  # true state untouched
+
+
+def test_env_wrapper_rejects_plain_gym_env() -> None:
+    with pytest.raises(TypeError):
+        EnvWrapper(gym.make("CartPole-v1"))  # type: ignore[arg-type]
