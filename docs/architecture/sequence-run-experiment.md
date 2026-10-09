@@ -85,7 +85,7 @@ sequenceDiagram
 
 ## Seeding
 
-- `config.seed` is the experiment's default root seed; the Run's own `seed` (authoritative, may override it for multi-seed benchmarks) is the one used. The manager derives independent seeds with `numpy.random.SeedSequence(seed).spawn(...)`: one for env construction, one for training, one for evaluation.
+- `config.seed` is the experiment's default root seed; the Run's own `seed` (authoritative, may override it for multi-seed benchmarks) is the one used. The manager derives independent seeds as `train, eval = (int(c.generate_state(1)[0]) for c in SeedSequence(seed).spawn(2))`, in that fixed order. There is no env-construction seed: environments are seeded only through `reset(seed=...)`.
 - Fairness: for the same run seed every controller gets identical evaluation seeds, and the training environment uses the same wrapper stack as the evaluation environment, except perturbations marked `apply_to: eval` (or `train`).
 - Evaluation episode `i` resets with `eval_seed + i` (or the i-th spawned child), so every controller in a benchmark sees identical initial states (§6.8).
 - No global RNG is used; seeds are passed explicitly to `reset`, `train`, and `evaluate`. The derived seeds are written to the Run row.

@@ -9,7 +9,7 @@ with fixed library versions, and that this can break across versions or on GPU/m
 
 ## Decision
 Every run stores a reproducibility block (core type `RunRecord`; DB columns on `RUN`/`EXPERIMENT`):
-- `seed`: the authoritative root seed of the run (`config.seed` is only the experiment default); `derived_seeds` (env, train, eval) spawned with `numpy.random.SeedSequence(seed)`;
+- `seed`: the authoritative root seed of the run (`config.seed` is only the experiment default); `derived_seeds` (keys `train`, `eval`) computed as `int(child.generate_state(1)[0])` for the two children of `numpy.random.SeedSequence(seed).spawn(2)`, in that fixed order (an `env` seed was dropped: environments take seeds only through `reset(seed=...)`, so it had no consumer);
   evaluation episode `i` uses `eval_seed + i`. Seeds are passed explicitly, never via global RNG.
 - `config`: the validated `ExperimentConfig` stored verbatim, with `config_hash` (sha256 of canonical JSON of the resolved config, `seed` and `name` excluded).
 - `versions` (core `RunRecord.versions`, DB `RUN.versions`): python, numpy, gymnasium, pydantic,

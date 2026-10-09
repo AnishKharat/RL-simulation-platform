@@ -55,7 +55,7 @@ def test_run_record() -> None:
     cfg = ExperimentConfig.model_validate(VALID)
     rec = RunRecord(
         seed=7,
-        derived_seeds={"env": 1, "train": 2, "eval": 3},
+        derived_seeds={"train": 2, "eval": 3},
         config=cfg,
         config_hash=cfg.config_hash(),
         versions={"numpy": "2.0", "controller:pid": "0.1.0"},
@@ -103,12 +103,37 @@ def test_perturbation_config_and_hash_sensitivity() -> None:
         ExperimentConfig.model_validate({**VALID, "perturbations": [{**p, "typo": 1}]})
 
 
+def test_derived_seeds_keys_are_train_and_eval() -> None:
+    cfg = ExperimentConfig.model_validate(VALID)
+    for bad in ({"env": 1, "train": 2, "eval": 3}, {"train": 2}):
+        with pytest.raises(ValidationError):
+            RunRecord(
+                seed=1,
+                derived_seeds=bad,
+                config=cfg,
+                config_hash="h",
+                versions={},
+                code_version="c",
+            )
+
+
+def test_derivation_recipe_is_stable() -> None:
+    """The documented recipe in ExperimentConfig is deterministic and order-sensitive."""
+    import numpy as np
+
+    def derive(seed: int) -> tuple[int, int]:
+        a, b = (int(c.generate_state(1)[0]) for c in np.random.SeedSequence(seed).spawn(2))
+        return a, b
+
+    assert derive(7) == derive(7) and derive(7) != derive(8) and derive(7)[0] != derive(7)[1]
+
+
 def test_run_record_accepts_torch_environment_keys() -> None:
     cfg = ExperimentConfig.model_validate(VALID)
     versions = {"torch": "2.3.0", "cuda": "none", "device": "cpu", "num_threads": "1"}
     rec = RunRecord(
         seed=1,
-        derived_seeds={"env": 1, "train": 2, "eval": 3},
+        derived_seeds={"train": 2, "eval": 3},
         config=cfg,
         config_hash=cfg.config_hash(),
         versions=versions,

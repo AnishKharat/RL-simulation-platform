@@ -10,7 +10,7 @@ import hashlib
 import json
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class _Strict(BaseModel):
@@ -55,8 +55,11 @@ class ExperimentConfig(_Strict):
     Seeding contract: `seed` is the ONLY seed in the config, the default root seed of the
     experiment. Each Run may override it (`RunRecord.seed` is authoritative for that run);
     the environment, training and evaluation seeds are derived from the run's seed by the
-    experiment manager with `numpy.random.SeedSequence(seed)` spawning; evaluation episode i
-    resets the environment with `eval_seed + i`.
+    experiment manager, deterministically: `train, eval = (int(c.generate_state(1)[0]) for c in
+    numpy.random.SeedSequence(seed).spawn(2))`, in that fixed order. Evaluation episode i
+    resets the environment with `eval_seed + i`. There is no environment seed: environments
+    are seeded only through `reset(seed=...)` (training: from the train seed, evaluation: from
+    the eval seed).
 
     Fairness contract: for a given run seed every controller is evaluated on identical
     evaluation seeds (`eval_seed + i`), and the training environment is built with the same
@@ -92,7 +95,8 @@ class RunRecord(_Strict):
     """Reproducibility block stored with every run: what exactly was executed.
 
     * `seed`: the AUTHORITATIVE root seed of this run (may differ from `config.seed`, the
-      experiment default); `derived_seeds` are spawned from it, keys `env`, `train`, `eval`.
+      experiment default); `derived_seeds` are spawned from it with exactly the keys `train` and
+      `eval` (see `ExperimentConfig`).
     * `config` is the validated config as run (resolved params) and `config_hash` its
       `ExperimentConfig.config_hash()` (excludes seed and name).
     * `versions` maps name to version: python, numpy, gymnasium, pydantic, backend libs,
@@ -104,6 +108,14 @@ class RunRecord(_Strict):
 
     seed: int = Field(ge=0)
     derived_seeds: dict[str, int]
+
+    @field_validator("derived_seeds")
+    @classmethod
+    def _seed_keys(cls, v: dict[str, int]) -> dict[str, int]:
+        if set(v) != {"train", "eval"}:
+            raise ValueError("derived_seeds keys must be exactly 'train' and 'eval'")
+        return v
+
     config: ExperimentConfig
     config_hash: str
     versions: dict[str, str]

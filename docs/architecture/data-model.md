@@ -114,7 +114,7 @@ A run is reproducible if `RUN` and its `EXPERIMENT` contain:
 | Field | Where | Content |
 |---|---|---|
 | seed | `RUN.seed` (authoritative); `config.seed` is the experiment default | root seed of this run |
-| derived seeds | `RUN.derived_seeds` | env / train / eval seeds from `SeedSequence` |
+| derived seeds | `RUN.derived_seeds` | `train` and `eval` seeds: `SeedSequence(seed).spawn(2)` children, each `int(child.generate_state(1)[0])`, in that order (no `env` seed; environments are seeded only by `reset(seed)`) |
 | config verbatim | `EXPERIMENT.config` | the validated Pydantic dump, stored as submitted, (params resolved, defaults filled), plus `config_hash` (sha256 of canonical JSON, `seed` and `name` excluded, see `ExperimentConfig.config_hash`) |
 | library versions | `RUN.versions` | python, numpy, gymnasium, stable-baselines3, torch, rcl, platform; from `importlib.metadata`; RL runs add `cuda`, `device`, `num_threads` (CPU-only determinism claim, ADR 0010) |
 | code version | `RUN.code_version` | git commit sha and whether the tree was dirty |
