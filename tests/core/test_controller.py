@@ -22,6 +22,7 @@ def test_cannot_instantiate_abstract() -> None:
 class _Const(BaseController):
     metadata = ControllerMetadata(
         name="const",
+        version="0.1.0",
         family=ControllerFamily.CLASSICAL,
         supported_action_spaces=(ActionSpaceKind.CONTINUOUS,),
         requires_training=False,

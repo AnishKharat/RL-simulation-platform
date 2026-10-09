@@ -37,12 +37,15 @@ class Params(BaseModel):
 
 
 def _env_meta(kind: ActionSpaceKind = ActionSpaceKind.CONTINUOUS) -> EnvMetadata:
-    return EnvMetadata(name="e", dof=1, action_space_kind=kind, physics_backend="none")
+    return EnvMetadata(
+        name="e", version="0.1.0", dof=1, action_space_kind=kind, physics_backend="none"
+    )
 
 
 def _ctl_meta(*kinds: ActionSpaceKind) -> ControllerMetadata:
     return ControllerMetadata(
         name="c",
+        version="0.1.0",
         family=ControllerFamily.CLASSICAL,
         supported_action_spaces=kinds or (ActionSpaceKind.CONTINUOUS,),
         requires_training=False,
@@ -221,7 +224,7 @@ def test_discovery_of_fixture_package(
         @register_environment("{id}")
         class E:
             env_metadata = EnvMetadata(
-                name="{id}", dof=1, action_space_kind=ActionSpaceKind.CONTINUOUS,
+                name="{id}", version="0.1.0", dof=1, action_space_kind=ActionSpaceKind.CONTINUOUS,
                 physics_backend="none",
             )
     """

@@ -36,10 +36,12 @@ class EnvMetadata(_Spec):
     Contract: available without instantiating the environment. It carries no parameter
     schema: the single source of truth is the Pydantic params model given to
     `@register_environment(..., params=Model)`; the registry derives the JSON schema and the
-    defaults from it.
+    defaults from it. `version` is the component's own version string; it is recorded in
+    `RunRecord.versions` (key `env:<id>`) so a changed robot model is visible in the record.
     """
 
     name: str
+    version: str = Field(min_length=1)
     description: str = ""
     dof: int = Field(ge=1)
     action_space_kind: ActionSpaceKind
@@ -90,9 +92,11 @@ class ControllerMetadata(_Spec):
     """Static description of a controller. `supported_action_spaces` is declared, never
     hardcoded elsewhere: the registry uses it to filter compatible environments.
     `requires_training` is False for classical controllers (their `train` is a no-op); the
-    experiment manager reads it from here to decide whether to train."""
+    experiment manager reads it from here to decide whether to train. `version` is recorded
+    in `RunRecord.versions` (key `controller:<id>`)."""
 
     name: str
+    version: str = Field(min_length=1)
     description: str = ""
     family: ControllerFamily
     supported_action_spaces: tuple[ActionSpaceKind, ...] = Field(min_length=1)

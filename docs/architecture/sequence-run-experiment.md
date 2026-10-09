@@ -15,7 +15,7 @@ stateDiagram-v2
     failed --> [*]
 ```
 
-`failed` rows keep `error` (type, message, traceback) and the stage reached. No automatic retry; a re-run creates a new experiment with the same config and seed.
+`failed` rows keep `error` (type, message, traceback) and the stage reached. No automatic retry; a re-run adds a new Run to the same Experiment (ADR 0009), with the same config and seed unless overridden.
 
 ## Main flow
 
@@ -81,7 +81,7 @@ sequenceDiagram
 
 ## Seeding
 
-- One `experiment.seed` is stored in the config. The manager derives independent seeds with `numpy.random.SeedSequence(seed).spawn(...)`: one for env construction, one for training, one for evaluation.
+- `config.seed` is the experiment's default root seed; the Run's own `seed` (authoritative, may override it for multi-seed benchmarks) is the one used. The manager derives independent seeds with `numpy.random.SeedSequence(seed).spawn(...)`: one for env construction, one for training, one for evaluation.
 - Evaluation episode `i` resets with `eval_seed + i` (or the i-th spawned child), so every controller in a benchmark sees identical initial states (§6.8).
 - No global RNG is used; seeds are passed explicitly to `reset`, `train`, and `evaluate`. The derived seeds are written to the Run row.
 - Evaluation is the experiments-layer function `rollout(env, controller, n_episodes, seed) -> list[EpisodeTrajectory]` (contract only, not yet implemented): it is the only evaluation loop, takes any `BaseController`, resets episode `i` with `seed + i`, calls `predict` until `terminated or truncated`, calls `controller.reset()` right after `env.reset`, records true states via `env.get_state()` and judges success with the env's `TaskSpec`.

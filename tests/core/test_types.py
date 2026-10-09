@@ -82,6 +82,7 @@ def test_specs_forbid_extra_and_are_frozen() -> None:
 def test_metadata_and_specs_round_trip() -> None:
     md = ControllerMetadata(
         name="pid",
+        version="0.1.0",
         family=ControllerFamily.CLASSICAL,
         supported_action_spaces=(ActionSpaceKind.CONTINUOUS,),
         requires_training=False,
@@ -89,7 +90,11 @@ def test_metadata_and_specs_round_trip() -> None:
     assert ControllerMetadata.model_validate_json(md.model_dump_json()) == md
     with pytest.raises(ValidationError):
         ControllerMetadata(
-            name="x", family=ControllerFamily.RL, supported_action_spaces=(), requires_training=True
+            name="x",
+            version="0.1.0",
+            family=ControllerFamily.RL,
+            supported_action_spaces=(),
+            requires_training=True,
         )
     es = EnvSpec(
         env_id="cartpole",

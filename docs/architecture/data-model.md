@@ -97,7 +97,7 @@ erDiagram
 
 ## Notes on entities
 
-- **Experiment** is the reusable definition (config), **Run** is one execution. Phase 1 creates exactly one Run per Experiment. A multi-seed benchmark creates one Experiment per (controller, env, seed) cell, or one Run per seed under a shared Experiment. The latter is preferred, because aggregation then needs only a `GROUP BY experiment_id`. Decision to confirm in the registry/benchmark ADR.
+- **Experiment** is the reusable definition (config), **Run** is one execution. Phase 1 creates exactly one Run per Experiment. A multi-seed benchmark creates one Run per seed under a shared Experiment (decided in ADR 0009), so aggregation needs only a `GROUP BY experiment_id`. This works because `config_hash` excludes `seed` and `name`, and `RUN.seed` is the authoritative seed of each run (`config.seed` is only the default).
 - **EpisodeTrajectory** is not a table. The DB holds an `EPISODE` row with a pointer to the trajectory artifact (see below).
 - **METRIC_RESULT** has one row per (run, episode, metric_name). Rows with `episode_id` NULL hold run-level scalars (e.g. final training return). `value` is NULL and `status = undefined` when a metric is not defined for that episode (see `rcl/metrics/DEFINITIONS.md`).
 - **AGGREGATE_RESULT** is a cache of cross-seed statistics (mean, CI) that `analytics` can always recompute. Introduced in Phase 2; Phase 1 does not need it.
@@ -109,13 +109,13 @@ A run is reproducible if `RUN` and its `EXPERIMENT` contain:
 
 | Field | Where | Content |
 |---|---|---|
-| seed | `RUN.seed`, `config.experiment.seed` | root seed |
+| seed | `RUN.seed` (authoritative); `config.seed` is the experiment default | root seed of this run |
 | derived seeds | `RUN.derived_seeds` | env / train / eval seeds from `SeedSequence` |
-| config verbatim | `EXPERIMENT.config` | the validated Pydantic dump, stored as submitted, plus `config_hash` (sha256 of canonical JSON) |
+| config verbatim | `EXPERIMENT.config` | the validated Pydantic dump, stored as submitted, (params resolved, defaults filled), plus `config_hash` (sha256 of canonical JSON, `seed` and `name` excluded, see `ExperimentConfig.config_hash`) |
 | library versions | `RUN.versions` | python, numpy, gymnasium, stable-baselines3, torch, rcl, platform; from `importlib.metadata` |
 | code version | `RUN.code_version` | git commit sha and whether the tree was dirty |
 
-Registry entry versions (env/controller `version` metadata) are recorded inside `RUN.versions`. If the tree was dirty, the diff is not stored; the flag only warns that reproduction may differ.
+Registry entry versions (`EnvMetadata.version` / `ControllerMetadata.version`) are recorded inside `RUN.versions` as `env:<id>` and `controller:<id>`. The core type `RunRecord` mirrors these columns (`seed`, `derived_seeds`, `config`, `config_hash`, `versions`, `code_version`). If the tree was dirty, the diff is not stored; the flag only warns that reproduction may differ.
 
 ## DB versus MLflow (§6.6)
 

@@ -15,7 +15,11 @@ def test_cannot_instantiate_abstract() -> None:
 
 class _Dummy(BaseEnvironment):
     env_metadata = EnvMetadata(
-        name="dummy", dof=1, action_space_kind=ActionSpaceKind.CONTINUOUS, physics_backend="none"
+        name="dummy",
+        version="0.1.0",
+        dof=1,
+        action_space_kind=ActionSpaceKind.CONTINUOUS,
+        physics_backend="none",
     )
 
     def __init__(self) -> None:
