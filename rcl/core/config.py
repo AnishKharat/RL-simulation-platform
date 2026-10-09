@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,6 +25,15 @@ class ComponentConfig(_Strict):
 
     id: str = Field(min_length=1)
     params: dict[str, Any] = Field(default_factory=dict)
+
+
+class PerturbationConfig(ComponentConfig):
+    """A perturbation (noise, disturbance, delay) applied as an `EnvWrapper` around the
+    environment. `id` and `params` are as in `ComponentConfig`. `apply_to` selects the stack:
+    "eval" (default; robustness testing of a controller trained on the clean env), "train"
+    or "both". The wrapper stack is applied in list order."""
+
+    apply_to: Literal["train", "eval", "both"] = "eval"
 
 
 class TrainingSection(_Strict):
@@ -49,21 +58,32 @@ class ExperimentConfig(_Strict):
     experiment manager with `numpy.random.SeedSequence(seed)` spawning; evaluation episode i
     resets the environment with `eval_seed + i`.
 
+    Fairness contract: for a given run seed every controller is evaluated on identical
+    evaluation seeds (`eval_seed + i`), and the training environment is built with the same
+    wrapper stack as the evaluation environment, differing only by perturbations explicitly marked
+    `apply_to="eval"`.
+
     `config_hash()` identifies the experiment DEFINITION and therefore excludes `seed` (varied
     per Run) and `name` (a label), so all seeds of one benchmark cell share one hash.
     """
 
+    schema_version: int = 1
     name: str = Field(min_length=1)
     seed: int = Field(ge=0)
     environment: ComponentConfig
     controller: ComponentConfig
+    perturbations: list[PerturbationConfig] = Field(default_factory=list)
     training: TrainingSection | None = None
     evaluation: EvaluationSection
 
     def config_hash(self) -> str:
         """sha256 hex of the canonical JSON (sorted keys, no spaces) of the config without
-        `seed` and `name`. Hash the RESOLVED config (defaults filled by the registry)."""
+        `seed` and `name`; an empty `perturbations` list is left out of the payload, so adding
+        the field did not change the hash of perturbation-free configs. Hash the RESOLVED
+        config (defaults filled by the registry)."""
         data = self.model_dump(mode="json", exclude={"seed", "name"})
+        if not data["perturbations"]:
+            del data["perturbations"]
         blob = json.dumps(data, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 

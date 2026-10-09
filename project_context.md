@@ -131,15 +131,16 @@ class BaseController(ABC):
 
 ### 5.4 Experiment config (single source of truth)
 ```yaml
-experiment:
-  name: pid_vs_ppo_cartpole
-  seed: 42
-  environment: { id: cartpole, params: {...} }
-  controller:  { id: pid, params: {...} }
-  training:    { total_timesteps: 100000 }   # RL only
-  evaluation:  { episodes: 20 }
+schema_version: 1
+name: pid_vs_ppo_cartpole
+seed: 42                                   # default root seed; each Run may override it
+environment:   { id: cartpole, params: {...} }
+controller:    { id: pid, params: {...} }
+perturbations: []                          # optional; [{ id, params, apply_to: train|eval|both }]
+training:      { total_timesteps: 100000 } # RL only
+evaluation:    { episodes: 20 }
 ```
-Validated with Pydantic, stored verbatim in the DB, and sufficient to reproduce a run.
+Implemented as `rcl.core.config.ExperimentConfig` (flat, no `experiment:` wrapper). Validated with Pydantic, stored verbatim (params resolved) in the DB, and sufficient to reproduce a run. `config_hash` excludes `seed` and `name` (and an empty `perturbations`). Fairness: same eval seeds across controllers for a run seed; training env uses the same wrapper stack as evaluation.
 
 ---
 
