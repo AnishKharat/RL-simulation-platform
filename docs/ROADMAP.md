@@ -19,8 +19,8 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 ---
 
 ## Phase 0 — Architecture
-- ☐ Repo scaffold: `pyproject.toml`, folder structure, `.gitignore`, pre-commit config
-- ☐ CI workflow (lint + tests)
+- ☑ Repo scaffold: `pyproject.toml`, folder structure, `.gitignore`, pre-commit config
+- ☑ CI workflow (lint + tests)
 - ☐ Component architecture diagram
 - ☐ "Run experiment" sequence diagram
 - ☐ Data model diagram
@@ -29,7 +29,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☐ Spec/config types (`EnvSpec`, `TaskSpec`, `EpisodeTrajectory`, experiment config schema)
 - ☐ Registry design doc + stub
 - ☐ Metric definitions doc
-- ☐ Import-linter rules for dependency layers
+- ☑ Import-linter rules for dependency layers
 - ☐ Spike: SB3 trains on a custom env
 - ☐ Spike: FastAPI background job
 - ☐ ADRs (one commit each)

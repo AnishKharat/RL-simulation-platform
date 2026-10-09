@@ -1,0 +1,98 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rcl"
+version = "0.0.1"
+description = "Robotics Control Lab: benchmark classical and RL controllers on simulated robots."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2", "numpy", "gymnasium"]
+
+[project.optional-dependencies]
+rl = ["stable-baselines3"]
+api = ["fastapi", "uvicorn", "sqlalchemy"]
+frontend = ["streamlit", "plotly"]
+dev = ["pytest", "ruff", "mypy", "import-linter", "pre-commit", "httpx"]
+
+[tool.setuptools.packages.find]
+include = ["rcl*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.importlinter]
+root_package = "rcl"
+
+[[tool.importlinter.contracts]]
+name = "core imports nothing from the project"
+type = "forbidden"
+source_modules = ["rcl.core"]
+forbidden_modules = [
+    "rcl.registry", "rcl.environments", "rcl.controllers", "rcl.experiments", "rcl.metrics",
+    "rcl.analytics", "rcl.persistence", "rcl.api", "rcl.frontend",
+]
+
+[[tool.importlinter.contracts]]
+name = "environments and controllers import only core"
+type = "forbidden"
+source_modules = ["rcl.environments", "rcl.controllers"]
+forbidden_modules = [
+    "rcl.registry", "rcl.experiments", "rcl.metrics", "rcl.analytics", "rcl.persistence",
+    "rcl.api", "rcl.frontend",
+]
+
+[[tool.importlinter.contracts]]
+name = "environments and controllers do not import each other"
+type = "independence"
+modules = ["rcl.environments", "rcl.controllers"]
+
+[[tool.importlinter.contracts]]
+name = "experiments import only core, registry, metrics, persistence"
+type = "forbidden"
+source_modules = ["rcl.experiments"]
+forbidden_modules = [
+    "rcl.environments", "rcl.controllers", "rcl.analytics", "rcl.api", "rcl.frontend",
+]
+
+[[tool.importlinter.contracts]]
+name = "api imports only experiments, analytics, registry, persistence"
+type = "forbidden"
+source_modules = ["rcl.api"]
+forbidden_modules = ["rcl.environments", "rcl.controllers", "rcl.metrics", "rcl.frontend"]
+
+[[tool.importlinter.contracts]]
+name = "frontend imports no other rcl package (HTTP to api only)"
+type = "forbidden"
+source_modules = ["rcl.frontend"]
+forbidden_modules = [
+    "rcl.core", "rcl.registry", "rcl.environments", "rcl.controllers", "rcl.experiments",
+    "rcl.metrics", "rcl.analytics", "rcl.persistence", "rcl.api",
+]
+
+[[tool.importlinter.contracts]]
+name = "layers depend downward only"
+type = "layers"
+layers = [
+    "rcl.frontend",
+    "rcl.api",
+    "rcl.experiments",
+    "rcl.analytics | rcl.registry | rcl.persistence | rcl.metrics",
+    "rcl.environments | rcl.controllers",
+    "rcl.core",
+]
