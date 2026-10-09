@@ -1,6 +1,6 @@
 # Architecture Status
 
-**State: DRAFT**  <!-- DRAFT | IN REVIEW | FROZEN -->
+**State: IN REVIEW**  <!-- DRAFT | IN REVIEW | FROZEN -->
 
 Implementation (anything beyond docs, stubs, spikes) is allowed only when this says FROZEN.
 
@@ -8,7 +8,7 @@ Implementation (anything beyond docs, stubs, spikes) is allowed only when this s
 
 | # | Date | Focus | Changes / ADRs | Done |
 |---|------|-------|----------------|------|
-| 1 |      |       |                | ☐    |
+| 1 | 2026-10-10 | Interfaces, registry, config schema consistency | Registry/env_metadata fix, controller `reset()`, rollout moved to experiments (ADR 0013), TaskSpec cleanup, requires_training in metadata, single param-schema source, seed/config_hash, EnvSpec validators, EnvWrapper | ☑    |
 | 2 |      |       |                | ☐    |
 | 3 |      |       |                | ☐    |
 
