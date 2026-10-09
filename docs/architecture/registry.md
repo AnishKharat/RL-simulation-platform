@@ -52,7 +52,7 @@ both so the dropdown filters from registry data only.
 
 ## 5. Discovery
 
-`discover(packages=("rcl.environments", "rcl.controllers"))` walks each package with `pkgutil.walk_packages` and
+`discover(packages=DISCOVERY_PACKAGES)` (one constant: `rcl.environments`, `rcl.controllers`, `rcl.perturbations`, `rcl.ros_adapter`; a test keeps it equal to the import-linter plugin tier) walks each package with `pkgutil.walk_packages` and
 imports every module; importing runs the decorators. Subpackages (`controllers.classical`, `controllers.rl`) are
 covered by the recursive walk. Idempotent (Python caches imports). A module that fails to import raises
 `RegistryError` naming that module (not only the package) and chaining the cause: a broken robot file is loud, not silently missing.

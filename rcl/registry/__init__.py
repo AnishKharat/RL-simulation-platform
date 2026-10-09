@@ -1,6 +1,7 @@
 """Environment and controller registries."""
 
 from rcl.registry.registry import (
+    DISCOVERY_PACKAGES,
     DuplicateIdError,
     Entry,
     Registry,
@@ -14,6 +15,7 @@ from rcl.registry.registry import (
 )
 
 __all__ = [
+    "DISCOVERY_PACKAGES",
     "DuplicateIdError",
     "Entry",
     "Registry",

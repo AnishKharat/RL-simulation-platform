@@ -27,3 +27,6 @@ environment's tests assert this (see `tests/core/test_environment.py` for the pa
 - Free-form capability string sets: untyped, easy to misspell; three booleans/ints cover the known cases.
 - Deriving `linearizable` by calling `get_linearization()` at registration: needs instantiation, which metadata
   must not (it is class-level).
+
+## Phase 4 note
+Perturbations (`rcl.perturbations`, `EnvWrapper` subclasses) will likely need their own registry kind and `PerturbationMetadata` (e.g. which env action/observation kinds they support, ADR 0014 axes). This is deferred to Phase 4: no `perturbation` kind exists today and `ExperimentConfig.perturbations` ids are not yet registry-validated.

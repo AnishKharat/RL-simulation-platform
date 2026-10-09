@@ -181,7 +181,17 @@ def register_controller(
     return _decorator("controller", id, params)
 
 
-def discover(packages: Collection[str] = ("rcl.environments", "rcl.controllers")) -> None:
+# Single list of plugin packages scanned for decorators; keep in sync with the import-linter
+# contracts in pyproject.toml (a test enforces it).
+DISCOVERY_PACKAGES: tuple[str, ...] = (
+    "rcl.environments",
+    "rcl.controllers",
+    "rcl.perturbations",
+    "rcl.ros_adapter",
+)
+
+
+def discover(packages: Collection[str] = DISCOVERY_PACKAGES) -> None:
     """Import every module under ``packages`` (recursively) so their decorators run.
 
     A module that fails to import raises ``RegistryError`` naming that module (not just the

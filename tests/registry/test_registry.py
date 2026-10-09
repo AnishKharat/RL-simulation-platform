@@ -279,3 +279,18 @@ def test_compatibility_checks_linearization_and_action_dim(reg: Registry) -> Non
     assert ids(reg.compatible_controllers("lin2")) == ["any", "lqr"]
     assert ids(reg.compatible_environments("lqr")) == ["lin", "lin2"]
     assert ids(reg.compatible_environments("scalar")) == ["lin", "plain"]
+
+
+def test_discovery_packages_constant_matches_import_linter_contracts() -> None:
+    import tomllib
+    from pathlib import Path
+
+    from rcl.registry import DISCOVERY_PACKAGES
+
+    cfg = tomllib.loads((Path(__file__).parents[2] / "pyproject.toml").read_text(encoding="utf-8"))
+    contracts = {c["name"]: c for c in cfg["tool"]["importlinter"]["contracts"]}
+    layers = next(c for c in contracts.values() if c["type"] == "layers")["layers"]
+    tier = next(layer for layer in layers if "rcl.environments" in layer)
+    independent = next(c for c in contracts.values() if c["type"] == "independence")["modules"]
+    assert set(DISCOVERY_PACKAGES) == set(independent) == {m.strip() for m in tier.split("|")}
+    discover()  # default scan imports every plugin package, including the empty ones
