@@ -24,7 +24,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☐ Component architecture diagram
 - ☐ "Run experiment" sequence diagram
 - ☐ Data model diagram
-- ☐ `core/` interface stubs (`BaseEnvironment`)
+- ☑ `core/` interface stubs (`BaseEnvironment`)
 - ☐ `core/` interface stubs (`BaseController`)
 - ☐ Spec/config types (`EnvSpec`, `TaskSpec`, `EpisodeTrajectory`, experiment config schema)
 - ☐ Registry design doc + stub
