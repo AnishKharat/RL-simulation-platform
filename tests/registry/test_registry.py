@@ -56,7 +56,7 @@ def _ctl_meta(*kinds: ActionSpaceKind) -> ControllerMetadata:
 
 
 def _env_cls(kind: ActionSpaceKind = ActionSpaceKind.CONTINUOUS) -> type:
-    return type("E", (), {"env_metadata": _env_meta(kind)})
+    return type("E", (BaseEnvironment,), {"env_metadata": _env_meta(kind)})
 
 
 def _named_env(qualname: str) -> type:
@@ -66,7 +66,7 @@ def _named_env(qualname: str) -> type:
 
 
 def _ctl_cls(*kinds: ActionSpaceKind) -> type:
-    return type("C", (), {"metadata": _ctl_meta(*kinds)})
+    return type("C", (BaseController,), {"metadata": _ctl_meta(*kinds)})
 
 
 @pytest.fixture
@@ -77,7 +77,7 @@ def reg():
 
 def test_register_lookup_and_info(reg: Registry) -> None:
     @register_controller("pid", params=Params)
-    class PID:
+    class PID(BaseController):
         metadata = _ctl_meta()
 
     entry = reg.get("controller", "pid")
@@ -192,6 +192,30 @@ def test_no_params_model_accepts_only_empty(reg: Registry) -> None:
         entry.validate_params({"x": 1})
 
 
+def test_class_must_subclass_base_of_its_kind(reg: Registry) -> None:
+    plain_env = type("E", (), {"env_metadata": _env_meta()})
+    plain_ctl = type("C", (), {"metadata": _ctl_meta()})
+    with pytest.raises(RegistryError, match="BaseEnvironment"):
+        register_environment("e")(plain_env)
+    with pytest.raises(RegistryError, match="BaseController"):
+        register_controller("c")(plain_ctl)
+    with pytest.raises(RegistryError, match="BaseController"):
+        register_controller("c")(_env_cls())  # wrong kind of base
+    assert reg.entries("environment") == [] and reg.entries("controller") == []
+
+
+def test_is_compatible(reg: Registry) -> None:
+    cont, disc = ActionSpaceKind.CONTINUOUS, ActionSpaceKind.DISCRETE
+    register_environment("cont")(_env_cls(cont))
+    register_environment("disc")(_env_cls(disc))
+    register_controller("pid")(_ctl_cls(cont))
+    assert reg.is_compatible("pid", "cont") and not reg.is_compatible("pid", "disc")
+    with pytest.raises(UnknownIdError):
+        reg.is_compatible("nope", "cont")
+    with pytest.raises(UnknownIdError):
+        reg.is_compatible("pid", "nope")
+
+
 def test_unknown_id(reg: Registry) -> None:
     with pytest.raises(UnknownIdError):
         reg.get("environment", "nope")
@@ -221,11 +245,12 @@ def test_discovery_of_fixture_package(
     reg: Registry, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     body = """
+        from rcl.core.environment import BaseEnvironment
         from rcl.core.types import ActionSpaceKind, EnvMetadata
         from rcl.registry import register_environment
 
         @register_environment("{id}")
-        class E:
+        class E(BaseEnvironment):
             env_metadata = EnvMetadata(
                 name="{id}", version="0.1.0", dof=1, action_space_kind=ActionSpaceKind.CONTINUOUS,
                 physics_backend="none",
@@ -257,7 +282,7 @@ def test_compatibility_checks_linearization_and_action_dim(reg: Registry) -> Non
             physics_backend="none",
             **kw,
         )
-        return type("E", (), {"env_metadata": meta})
+        return type("E", (BaseEnvironment,), {"env_metadata": meta})
 
     def ctl(**kw: Any) -> type:
         meta = ControllerMetadata(
@@ -268,7 +293,7 @@ def test_compatibility_checks_linearization_and_action_dim(reg: Registry) -> Non
             requires_training=False,
             **kw,
         )
-        return type("C", (), {"metadata": meta})
+        return type("C", (BaseController,), {"metadata": meta})
 
     reg.register("environment", "plain", env())
     reg.register("environment", "lin", env(linearizable=True))
@@ -300,7 +325,7 @@ def test_discovery_packages_constant_matches_import_linter_contracts() -> None:
 
 
 def test_param_validation_error_shape(reg: Registry) -> None:
-    register_controller("pid", params=Params)(type("C", (), {"metadata": _ctl_meta()}))
+    register_controller("pid", params=Params)(_ctl_cls())
     entry = reg.get("controller", "pid")
     with pytest.raises(ParamValidationError) as exc:
         entry.validate_params({"kp": "abc", "kd": 1, "gains": [1.0]})
