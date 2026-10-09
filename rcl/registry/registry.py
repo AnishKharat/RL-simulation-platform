@@ -1,0 +1,169 @@
+"""Environment and controller registry. See docs/architecture/registry.md.
+
+Contract: imports only ``rcl.core`` (currently nothing; metadata is read structurally).
+The default registry is the single piece of global state in the project.
+"""
+
+from __future__ import annotations
+
+import importlib
+import pkgutil
+import re
+from collections.abc import Callable, Collection, Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Any, Literal
+
+from pydantic import BaseModel
+
+Kind = Literal["environment", "controller"]
+_ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+class RegistryError(Exception):
+    """Bad entry or failed discovery."""
+
+
+class DuplicateIdError(RegistryError):
+    """An id is already registered for this kind by a different class."""
+
+
+class UnknownIdError(RegistryError, KeyError):
+    """Lookup of an id that is not registered."""
+
+
+@dataclass(frozen=True)
+class Entry:
+    """One registered class. ``metadata`` is ``cls.metadata`` (core's Env/ControllerMetadata)."""
+
+    kind: Kind
+    id: str
+    cls: type
+    metadata: Any
+    params_model: type[BaseModel] | None = None
+
+    def info(self) -> dict[str, Any]:
+        """API/frontend-facing description: metadata plus the JSON schema for the param form."""
+        meta = self.metadata.model_dump() if hasattr(self.metadata, "model_dump") else self.metadata
+        schema = self.params_model.model_json_schema() if self.params_model else {}
+        return {"id": self.id, "kind": self.kind, "metadata": meta, "params_schema": schema}
+
+    def validate_params(self, raw: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Validate ``raw`` against the param model (defaults filled in); {} if none declared."""
+        if self.params_model is None:
+            return dict(raw or {})
+        return self.params_model(**(raw or {})).model_dump()
+
+
+class Registry:
+    """Two id namespaces (environments, controllers) with compatibility queries."""
+
+    def __init__(self) -> None:
+        self._entries: dict[Kind, dict[str, Entry]] = {"environment": {}, "controller": {}}
+
+    def register(
+        self, kind: Kind, id: str, cls: type, params: type[BaseModel] | None = None
+    ) -> None:
+        """Add an entry; raises RegistryError (bad entry) or DuplicateIdError."""
+        if not _ID_RE.match(id):
+            raise RegistryError(f"invalid {kind} id {id!r}: must match {_ID_RE.pattern}")
+        if not hasattr(cls, "metadata"):
+            raise RegistryError(f"{cls.__qualname__} has no `metadata` attribute")
+        if params is not None and not (isinstance(params, type) and issubclass(params, BaseModel)):
+            raise RegistryError(f"params for {id!r} must be a pydantic BaseModel subclass")
+        existing = self._entries[kind].get(id)
+        if existing is not None:
+            if existing.cls is cls:
+                return
+            raise DuplicateIdError(
+                f"{kind} {id!r} already registered by {existing.cls.__qualname__}"
+            )
+        self._entries[kind][id] = Entry(kind, id, cls, cls.metadata, params)
+
+    def get(self, kind: Kind, id: str) -> Entry:
+        try:
+            return self._entries[kind][id]
+        except KeyError:
+            known = sorted(self._entries[kind])
+            raise UnknownIdError(f"unknown {kind} {id!r}; known: {known}") from None
+
+    def entries(self, kind: Kind) -> list[Entry]:
+        return [self._entries[kind][i] for i in sorted(self._entries[kind])]
+
+    def compatible_controllers(self, env_id: str) -> list[Entry]:
+        """Controllers whose supported_action_spaces contain the env's action_space_kind."""
+        kind = self.get("environment", env_id).metadata.action_space_kind
+        return [c for c in self.entries("controller") if _supports(c.metadata, kind)]
+
+    def compatible_environments(self, controller_id: str) -> list[Entry]:
+        """Inverse of :meth:`compatible_controllers`."""
+        meta = self.get("controller", controller_id).metadata
+        return [
+            e for e in self.entries("environment") if _supports(meta, e.metadata.action_space_kind)
+        ]
+
+
+def _supports(controller_meta: Any, kind: str) -> bool:
+    spaces: Collection[str] = controller_meta.supported_action_spaces
+    return kind in spaces
+
+
+_default = Registry()
+
+
+def get_registry() -> Registry:
+    """The process-wide registry that the decorators write to."""
+    return _default
+
+
+@contextmanager
+def use_registry(registry: Registry) -> Iterator[Registry]:
+    """Temporarily swap the default registry (test isolation)."""
+    global _default
+    previous, _default = _default, registry
+    try:
+        yield registry
+    finally:
+        _default = previous
+
+
+def _decorator(kind: Kind, id: str, params: type[BaseModel] | None) -> Callable[[type], type]:
+    def wrap(cls: type) -> type:
+        get_registry().register(kind, id, cls, params)
+        return cls
+
+    return wrap
+
+
+def register_environment(
+    id: str, *, params: type[BaseModel] | None = None
+) -> Callable[[type], type]:
+    """Class decorator: register an environment under ``id``. Returns the class unchanged."""
+    return _decorator("environment", id, params)
+
+
+def register_controller(
+    id: str, *, params: type[BaseModel] | None = None
+) -> Callable[[type], type]:
+    """Class decorator: register a controller under ``id``. Returns the class unchanged."""
+    return _decorator("controller", id, params)
+
+
+def discover(packages: Collection[str] = ("rcl.environments", "rcl.controllers")) -> None:
+    """Import every module under ``packages`` (recursively) so their decorators run."""
+    for name in packages:
+        try:
+            pkg = importlib.import_module(name)
+            paths = getattr(pkg, "__path__", None)
+            if paths is None:
+                continue
+            for mod in pkgutil.walk_packages(paths, prefix=f"{name}.", onerror=_raise):
+                importlib.import_module(mod.name)
+        except RegistryError:
+            raise
+        except Exception as exc:
+            raise RegistryError(f"discovery failed in {name!r}: {exc!r}") from exc
+
+
+def _raise(name: str) -> None:
+    raise ImportError(f"cannot import {name}")
