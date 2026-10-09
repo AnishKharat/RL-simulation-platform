@@ -22,7 +22,7 @@ A metric returns `(value, status, unit)`. `status` is `ok`, `censored` (value is
 | **return** | `sum_{k=0}^{T-1} r_k` (undiscounted). Episode length `T` is reported separately as `n_steps`. | reward |
 | **angle_error** | RMS error `sqrt( (1/(T+1)) * sum_{k=0}^{T} e_k^2 )`. `max_abs_angle_error = max_{k=0..T} e_k` is a companion value. | rad |
 
-An episode terminated early by failure keeps the metrics of its `T` recorded steps; the termination is visible through `terminated` and (Phase 4) failure count, so truncation of the sum is not hidden.
+`terminated` means task failure only; an episode that reaches `success_hold_steps` ends with both flags False, and one that survives to the horizon is `truncated`. An episode terminated early by failure keeps the metrics of its `T` recorded steps; the termination is visible through `terminated` and (Phase 4) failure count, so truncation of the sum is not hidden.
 
 ## Phase 2 metrics
 
@@ -39,7 +39,7 @@ All use the error signal above. Define the normalized step progress `p_k = <w_k,
 
 **overshoot.** Defined only if `S >= S_min`. `100 * max(0, max_k p_k - 1)`, i.e. percent of the step size beyond the setpoint. Value `0` if the setpoint is never exceeded; `undefined` if `S < S_min`.
 
-**steady_state_error.** Mean error over the final window `W` = last `max(1, ceil(0.1*(T+1)))` state samples (indices `k <= T`): `(1/|W|) * sum_{k in W} e_k`. Unit follows `y`. For episodes terminated early the window is the last 10% of recorded samples and status is `censored` (the system did not reach steady state).
+**steady_state_error.** Mean error over the final window `W` = last `max(1, ceil(0.1*(T+1)))` state samples (indices `k <= T`): `(1/|W|) * sum_{k in W} e_k`. Unit follows `y`. For episodes terminated early by failure the window is the last 10% of recorded samples and status is `censored` (the system did not reach steady state).
 
 **energy_usage.** Actuation-energy proxy `sum_{k=0}^{T-1} ||u_k||_2^2 * dt` (action-unit^2 s, proportional to electrical energy `I^2 R t`). It is a proxy, not mechanical work; true mechanical energy `sum |u.v| dt` needs actuator velocity and is deferred until `TaskSpec` exposes it.
 

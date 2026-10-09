@@ -55,7 +55,7 @@ class BaseController(ABC):
       never from global RNG state.
     * Evaluation is NOT a controller method: the experiments layer owns one shared
       `rollout(env, controller, n_episodes, seed)` (episode i resets the env with `seed + i`,
-      steps `predict` until terminated/truncated, returns one `EpisodeTrajectory` each), so
+      steps `predict` until terminated, truncated or success; one `EpisodeTrajectory` each), so
       every controller is evaluated identically (ADR 0013).
     * `save(path)`/`load(path)` round-trip through a caller-created directory: a loaded
       controller predicts identically.

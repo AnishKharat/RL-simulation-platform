@@ -121,7 +121,8 @@ class TaskSpec(_Spec):
     """What 'success' means for an environment, in true-state coordinates.
 
     Success: |state - setpoint| <= tolerance element-wise for `success_hold_steps` consecutive
-    steps before the episode ends. `horizon_steps` is the time limit applied to every
+    steps; the rollout then ends the episode with `terminated` and `truncated` both False
+    (success is not termination). `horizon_steps` is the time limit applied to every
     controller (fair-comparison protocol, project_context 6.8). Failure semantics (e.g. pole
     falls) are described in `failure_description` and signalled via `terminated`.
 
@@ -215,8 +216,9 @@ class EpisodeTrajectory:
     With T = number of steps taken:
       observations, states: first axis T+1 (index 0 is the post-reset value);
       actions: first axis T; rewards: shape (T,); dt: control period in seconds.
-    Exactly one of `terminated` (task failure/end) or `truncated` (time limit) may be True,
-    never both. `success` is judged by the environment's TaskSpec. `seed` is the reset seed.
+    `terminated` (task failure only) and `truncated` (time limit) are never both True; both are
+    False when the episode ended on success (`success_hold_steps` reached). `success` is judged
+    by the environment's TaskSpec. `seed` is the reset seed.
     """
 
     observations: np.ndarray

@@ -21,7 +21,10 @@ class BaseEnvironment(gym.Env[Any, Any], ABC):
     * Determinism: all randomness comes from `self.np_random`, which is seeded ONLY through
       `reset(seed=...)` (never global RNGs, never a constructor seed). Same seed + same
       actions => identical trajectory. Simulation, not wall-clock, drives time (`dt` fixed).
-    * `terminated` = task failure/natural end; `truncated` = the `TaskSpec.horizon_steps`
+    * `terminated` = task FAILURE only (e.g. the pole fell); success is NOT termination: the
+      episode otherwise runs to the horizon or until the rollout sees `success_hold_steps`
+      consecutive in-tolerance steps (both flags False then). `truncated` = the
+      `TaskSpec.horizon_steps`
       time limit. They are never both True.
     * `env_metadata` (class level, `EnvMetadata`) is readable without instantiation and is
       what the registry/frontend use. It is distinct from gymnasium's `metadata` dict

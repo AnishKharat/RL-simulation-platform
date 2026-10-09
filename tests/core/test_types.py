@@ -176,3 +176,8 @@ def test_task_spec_derived_y_ref_and_validation() -> None:
             TaskSpec(setpoint=(0.0, 2.5), **b, **kw)
     with pytest.raises(ValidationError):
         TaskSpec(setpoint=(0.0,), error_state_indices=(0,), **kw)  # tolerance length
+
+
+def test_success_episode_has_neither_flag() -> None:
+    tr = _traj(terminated=False, truncated=False, success=True)
+    assert tr.success and not (tr.terminated or tr.truncated)

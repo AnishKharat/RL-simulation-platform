@@ -14,7 +14,7 @@ trains under PPO unchanged and that the same `obs -> action` callable serves PID
 Additional benchmarking hooks are abstract methods: `get_env_spec()`, `get_state()` (true state, not observation),
 `get_task_spec()`, and optional `get_linearization()`.
 - All randomness comes from `self.np_random`, seeded only via `reset(seed=)`; time is simulated (fixed `dt`).
-- `terminated` = failure/natural end; `truncated` = `TaskSpec.horizon_steps` limit; never both.
+- `terminated` = task failure only (success is not termination, architecture review 2); `truncated` = `TaskSpec.horizon_steps` limit; never both.
 - Envs are passed to SB3 as instances; no Gymnasium global registration.
 
 ## Consequences

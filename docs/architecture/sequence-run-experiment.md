@@ -66,7 +66,7 @@ sequenceDiagram
         EM->>ENV: reset(seed)
         EM->>CTL: reset()
         EM->>CTL: predict(obs)
-        EM->>ENV: step(action) until terminated or truncated
+        EM->>ENV: step(action) until terminated (failure), truncated (horizon) or success_hold_steps reached
     end
     Note over EM: rollout() is the single shared evaluation loop (ADR 0013); returns list of EpisodeTrajectory
 
@@ -87,7 +87,7 @@ sequenceDiagram
 - `config.seed` is the experiment's default root seed; the Run's own `seed` (authoritative, may override it for multi-seed benchmarks) is the one used. The manager derives independent seeds with `numpy.random.SeedSequence(seed).spawn(...)`: one for env construction, one for training, one for evaluation.
 - Evaluation episode `i` resets with `eval_seed + i` (or the i-th spawned child), so every controller in a benchmark sees identical initial states (§6.8).
 - No global RNG is used; seeds are passed explicitly to `reset`, `train`, and `evaluate`. The derived seeds are written to the Run row.
-- Evaluation is the experiments-layer function `rollout(env, controller, n_episodes, seed) -> list[EpisodeTrajectory]` (contract only, not yet implemented): it is the only evaluation loop, takes any `BaseController`, resets episode `i` with `seed + i`, calls `predict` until `terminated or truncated`, calls `controller.reset()` right after `env.reset`, records true states via `env.get_state()` and judges success with the env's `TaskSpec`.
+- Evaluation is the experiments-layer function `rollout(env, controller, n_episodes, seed) -> list[EpisodeTrajectory]` (contract only, not yet implemented): it is the only evaluation loop, takes any `BaseController`, resets episode `i` with `seed + i`, calls `predict` until `terminated` (task failure), `truncated` (horizon) or `success_hold_steps` consecutive in-tolerance steps (success is not termination; both flags False), calls `controller.reset()` right after `env.reset`, records true states via `env.get_state()` and judges success with the env's `TaskSpec`.
 
 ## Failure path
 
