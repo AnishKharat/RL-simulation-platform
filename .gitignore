@@ -9,6 +9,7 @@ venv/
 .mypy_cache/
 .import_linter_cache/
 mlruns/
+artifacts/
 *.db
 models/
 graphify-out/
