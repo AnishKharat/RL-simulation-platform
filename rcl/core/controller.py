@@ -12,6 +12,7 @@ from rcl.core.environment import BaseEnvironment
 from rcl.core.types import (
     ControllerMetadata,
     EnvSpec,
+    LinearModel,
     TrainConfig,
     TrainResult,
 )
@@ -25,8 +26,13 @@ class BaseController(ABC):
 
     Contract
     --------
-    * Lifecycle: `configure(env_spec, params)` is called exactly once before `predict`,
-      `train`; `params` is validated against the registry params model.
+    * Lifecycle: `configure(env_spec, params, linear_model)` is called exactly once before
+      `predict`, `train`; `params` is validated against the registry params model.
+      `linear_model` is the environment's `get_linearization()` result, passed by the
+      experiment manager (controllers never see the environment in `configure`). It is in
+      OBSERVATION coordinates (see `LinearModel`), so a model-based controller can act on `obs`
+      directly. It is None when the environment offers none; a controller whose metadata has
+      `requires_linearization` may raise ValueError on None.
       Configuration must fail loudly (ValueError) if `env_spec.action_space_kind` is not in
       `metadata.supported_action_spaces`.
     * `metadata` is class-level (readable without instantiation); the registry uses it to
@@ -53,7 +59,12 @@ class BaseController(ABC):
     metadata: ClassVar[ControllerMetadata]
 
     @abstractmethod
-    def configure(self, env_spec: EnvSpec, params: dict[str, Any]) -> None:
+    def configure(
+        self,
+        env_spec: EnvSpec,
+        params: dict[str, Any],
+        linear_model: LinearModel | None = None,
+    ) -> None:
         """Bind to an environment description and hyperparameters (see class contract)."""
 
     def reset(self) -> None:  # noqa: B027 - intentional optional hook

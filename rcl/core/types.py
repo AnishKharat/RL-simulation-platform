@@ -161,9 +161,13 @@ class TrainResult(_Spec):
 
 @dataclass(frozen=True)
 class LinearModel:
-    """Linearisation x[k+1] = A (x[k]-x_eq) + B (u[k]-u_eq) + x_eq, sampled at `dt`.
+    """Linearisation z[k+1] = A (z[k]-z_eq) + B (u[k]-u_eq) + z_eq, sampled at `dt`, where z
+    is the OBSERVATION vector (what `predict` receives), not the true state.
 
-    Contract: A is (n, n), B is (n, m), x_eq is (n,), u_eq is (m,), all float arrays.
+    Contract: A is (n, n), B is (n, m), x_eq (the observation at equilibrium; the field name is
+    kept for brevity) is (n,), u_eq is (m,), all float arrays, n = prod(EnvSpec.obs_shape).
+    An environment whose observation differs from its state (noise, partial) expresses the
+    model in observation coordinates, so controllers need not know the state-to-obs map.
     """
 
     A: np.ndarray
