@@ -43,6 +43,7 @@ def _ctl_meta(*kinds: ActionSpaceKind) -> ControllerMetadata:
         name="c",
         family=ControllerFamily.CLASSICAL,
         supported_action_spaces=kinds or (ActionSpaceKind.CONTINUOUS,),
+        requires_training=False,
     )
 
 
@@ -73,6 +74,7 @@ def test_register_lookup_and_info(reg: Registry) -> None:
 
     entry = reg.get("controller", "pid")
     assert entry.cls is PID
+    assert entry.info()["metadata"]["requires_training"] is False
     info = entry.info()
     assert info["params_schema"]["properties"]["kp"]["default"] == 1.0
     assert entry.validate_params({"kp": 2}) == {"kp": 2.0}

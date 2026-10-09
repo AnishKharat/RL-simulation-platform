@@ -26,13 +26,15 @@ class BaseController(ABC):
     Contract
     --------
     * Lifecycle: `configure(env_spec, params)` is called exactly once before `predict`,
-      `train`; `params` is validated against `metadata.params_schema`.
+      `train`; `params` is validated against the registry params model.
       Configuration must fail loudly (ValueError) if `env_spec.action_space_kind` is not in
       `metadata.supported_action_spaces`.
     * `metadata` is class-level (readable without instantiation); the registry uses it to
       build forms and to filter compatible environments. Never hardcode names elsewhere.
-    * `requires_training` is False for classical controllers; their `train` is a no-op
-      returning `TrainResult(timesteps=0)`. Controllers see environments only through
+    * `metadata.requires_training` is False for classical controllers; their `train` is a
+      no-op returning `TrainResult(timesteps=0)`. Training hyperparameters are part of the
+      controller `params`, not of `TrainConfig` (which holds only the budget and seed).
+    * Controllers see environments only through
       `BaseEnvironment` and `EnvSpec`, never a concrete robot.
     * `reset()` is called by the rollout at the start of every episode (after `env.reset`, before
       the first `predict`) to clear per-episode internal state (PID integrator and previous
@@ -49,7 +51,6 @@ class BaseController(ABC):
     """
 
     metadata: ClassVar[ControllerMetadata]
-    requires_training: ClassVar[bool]
 
     @abstractmethod
     def configure(self, env_spec: EnvSpec, params: dict[str, Any]) -> None:

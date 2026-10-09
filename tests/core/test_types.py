@@ -60,6 +60,15 @@ def test_linear_model_shapes() -> None:
         LinearModel(np.eye(3), np.ones((2, 1)), np.zeros(2), np.zeros(1), 0.1)
 
 
+def test_requires_training_is_mandatory_controller_metadata() -> None:
+    with pytest.raises(ValidationError):
+        ControllerMetadata.model_validate(
+            {"name": "x", "family": "rl", "supported_action_spaces": ["discrete"]}
+        )
+    with pytest.raises(ValidationError):
+        TrainConfig.model_validate({"total_timesteps": 1, "params": {}})  # no hyperparameters here
+
+
 def test_specs_forbid_extra_and_are_frozen() -> None:
     with pytest.raises(ValidationError):
         TrainConfig.model_validate({"total_timesteps": 10, "bogus": 1})
@@ -75,10 +84,13 @@ def test_metadata_and_specs_round_trip() -> None:
         name="pid",
         family=ControllerFamily.CLASSICAL,
         supported_action_spaces=(ActionSpaceKind.CONTINUOUS,),
+        requires_training=False,
     )
     assert ControllerMetadata.model_validate_json(md.model_dump_json()) == md
     with pytest.raises(ValidationError):
-        ControllerMetadata(name="x", family=ControllerFamily.RL, supported_action_spaces=())
+        ControllerMetadata(
+            name="x", family=ControllerFamily.RL, supported_action_spaces=(), requires_training=True
+        )
     es = EnvSpec(
         env_id="cartpole",
         action_space_kind=ActionSpaceKind.DISCRETE,

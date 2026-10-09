@@ -64,7 +64,7 @@ Dashed edges are special. The frontend edge is a network call, not an import. Th
 
 **environments** contain one file per robot (CartPole continuous/discrete, Pendulum balance/swing-up, later balance bot, arm). Each file implements `BaseEnvironment`, self-registers, and exposes `get_state`, `get_task_spec`, and optionally `get_linearization`. They import only `core` (plus the registry decorator, see above).
 
-**controllers** hold `classical/` (PID, LQR, later MPC) and `rl/` (thin SB3 wrappers). Each file implements `BaseController`, declares `requires_training` and supported action spaces, and self-registers. They never see a concrete robot.
+**controllers** hold `classical/` (PID, LQR, later MPC) and `rl/` (thin SB3 wrappers). Each file implements `BaseController`, declares `requires_training` and supported action spaces in its `ControllerMetadata`, and self-registers. They never see a concrete robot.
 
 **experiments** is the Experiment Manager: validates the config, seeds everything explicitly, resolves env/controller via the registry, runs train and evaluate, calls metrics, saves artifacts and run records through persistence, and records seed, config, and library/code versions. It is the only place that wires components together.
 

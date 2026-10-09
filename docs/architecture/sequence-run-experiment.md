@@ -51,7 +51,7 @@ sequenceDiagram
     EM->>ENV: create(params)
     EM->>CTL: configure(env_spec, params)
 
-    opt controller.requires_training
+    opt controller metadata requires_training
         EM->>CTL: train(env, TrainConfig, seed)
         CTL->>ENV: reset(seed) / step(action) ...
         CTL-->>EM: TrainResult (curves, checkpoint)

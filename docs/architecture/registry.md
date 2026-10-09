@@ -36,7 +36,7 @@ Violations raise `RegistryError`.
 ## 3. Entry contents
 
 `Entry(kind, id, cls, metadata, params_model)`; `metadata` is `cls.env_metadata` for environments and `cls.metadata` for controllers (core's `EnvMetadata` /
-`ControllerMetadata`). `Entry.info()` returns the API-facing dict:
+`ControllerMetadata`). `requires_training` is part of `ControllerMetadata` (no class attribute), so it appears in `info()["metadata"]`. Training hyperparameters live in the controller's own `params` model (one schema per controller); `TrainConfig` / `TrainingSection` carry only the budget (`total_timesteps`) and seed. `Entry.info()` returns the API-facing dict:
 `{id, kind, metadata: <model_dump>, params_schema: params_model.model_json_schema() or {}}` so the frontend renders
 forms from `params_schema` with no per-robot code. `Registry.entries(kind)` lists; `Entry.validate_params(raw)` validates through the model.
 

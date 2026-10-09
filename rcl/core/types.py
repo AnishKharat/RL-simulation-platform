@@ -89,12 +89,15 @@ class EnvSpec(_Spec):
 
 class ControllerMetadata(_Spec):
     """Static description of a controller. `supported_action_spaces` is declared, never
-    hardcoded elsewhere: the registry uses it to filter compatible environments."""
+    hardcoded elsewhere: the registry uses it to filter compatible environments.
+    `requires_training` is False for classical controllers (their `train` is a no-op); the
+    experiment manager reads it from here to decide whether to train."""
 
     name: str
     description: str = ""
     family: ControllerFamily
     supported_action_spaces: tuple[ActionSpaceKind, ...] = Field(min_length=1)
+    requires_training: bool
     params_schema: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -138,11 +141,12 @@ class TaskSpec(_Spec):
 
 
 class TrainConfig(_Spec):
-    """Training budget/hyperparameters. Classical controllers ignore it."""
+    """Training budget. Classical controllers ignore it. Algorithm hyperparameters (learning
+    rate, gamma, network size, ...) are NOT here: they are the controller's own `params`,
+    validated by its registry params model."""
 
     total_timesteps: int = Field(gt=0)
     seed: int = 0
-    params: dict[str, Any] = Field(default_factory=dict)
 
 
 class TrainResult(_Spec):

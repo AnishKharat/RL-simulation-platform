@@ -24,10 +24,10 @@ class ComponentConfig(_Strict):
 
 
 class TrainingSection(_Strict):
-    """Training budget (RL only; ignored by classical controllers)."""
+    """Training budget (RL only; ignored by classical controllers). Hyperparameters live in
+    `controller.params`, not here."""
 
     total_timesteps: int = Field(gt=0)
-    params: dict[str, Any] = Field(default_factory=dict)
 
 
 class EvaluationSection(_Strict):

@@ -24,8 +24,8 @@ class _Const(BaseController):
         name="const",
         family=ControllerFamily.CLASSICAL,
         supported_action_spaces=(ActionSpaceKind.CONTINUOUS,),
+        requires_training=False,
     )
-    requires_training = False
 
     def configure(self, env_spec: EnvSpec, params: dict[str, Any]) -> None:
         pass
