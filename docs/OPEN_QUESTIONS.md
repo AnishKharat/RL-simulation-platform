@@ -3,9 +3,7 @@
 > Agents: add ambiguities or architecture conflicts here and ask the user. Don't guess.
 > When answered, move the entry to "Resolved" with the decision (and an ADR link if one exists).
 
-## Open
-
-_None._
+## Open- **Q:** Root `CLAUDE.md` §1.3, `rcl/core|controllers|environments/CLAUDE.md` and project_context §3 still say env/controllers import "only `core`"; registry decision (a) allows `core` + `rcl.registry` (ADR 0003/0011, enforced in pyproject). Approve rewording these rule files? | **Raised by:** orchestrator, 2026-10-10 | **Affects:** CLAUDE.md, rcl/*/CLAUDE.md
 
 ## Resolved
 
