@@ -28,7 +28,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☐ `core/` interface stubs (`BaseController`)
 - ☐ Spec/config types (`EnvSpec`, `TaskSpec`, `EpisodeTrajectory`, experiment config schema)
 - ☐ Registry design doc + stub
-- ☐ Metric definitions doc
+- ☑ Metric definitions doc
 - ☑ Import-linter rules for dependency layers
 - ☐ Spike: SB3 trains on a custom env
 - ☐ Spike: FastAPI background job
