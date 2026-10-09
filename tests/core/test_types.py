@@ -181,6 +181,17 @@ def test_task_spec_derived_y_ref_and_validation() -> None:
         TaskSpec(setpoint=(0.0,), error_state_indices=(0,), **kw)  # tolerance length
 
 
+@pytest.mark.parametrize("bad", [float("inf"), float("nan")])
+def test_task_spec_rejects_non_finite(bad: float) -> None:
+    kw: dict[str, Any] = {"error_state_indices": (0,), "step_floor": 0.05, "horizon_steps": 5}
+    with pytest.raises(ValueError, match="finite"):
+        TaskSpec(setpoint=(0.0, 0.0), tolerance=(0.1, bad), **kw)
+    with pytest.raises(ValueError, match="finite"):
+        TaskSpec(setpoint=(bad, 0.0), tolerance=(0.1, 0.1), **kw)
+    big = TaskSpec(setpoint=(0.0, 0.0), tolerance=(0.1, 1e9), **kw)
+    assert TaskSpec.model_validate_json(big.model_dump_json()) == big
+
+
 def test_success_episode_has_neither_flag() -> None:
     tr = _traj(terminated=False, truncated=False, success=True)
     assert tr.success and not (tr.terminated or tr.truncated)

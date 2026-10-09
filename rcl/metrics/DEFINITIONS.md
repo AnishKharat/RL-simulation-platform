@@ -8,6 +8,7 @@ An `EpisodeTrajectory` with `T = n_steps` steps at fixed step `dt` (s) has T+1 s
 
 - `y(x) = x[error_state_indices]`: the controlled output vector (at least one component, e.g. pole angle in rad) and `y_ref = setpoint[error_state_indices]`: its reference (derived, not stored separately).
 - `wrap_indices` (subset of `error_state_indices`): output components that are angles.
+- Success (used by the rollout, not a metric): `|wrap(x_k[i] - setpoint[i])| <= tolerance[i]` for all components, with `wrap` applied to `wrap_indices` exactly as for the error below. "Unbounded" tolerance is a large finite value (`inf`/`nan` are rejected so the spec is JSON-safe).
 - `T_max = horizon_steps * dt` (s; there is no separate time-limit field).
 - `step_floor` (`S_min`): smallest step size treated as a real step response.
 
