@@ -49,12 +49,21 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "environments and controllers import only core"
+name = "environments and controllers import only core and registry"
 type = "forbidden"
 source_modules = ["rcl.environments", "rcl.controllers"]
 forbidden_modules = [
-    "rcl.registry", "rcl.experiments", "rcl.metrics", "rcl.analytics", "rcl.persistence",
+    "rcl.experiments", "rcl.metrics", "rcl.analytics", "rcl.persistence",
     "rcl.api", "rcl.frontend",
+]
+
+[[tool.importlinter.contracts]]
+name = "registry imports only core"
+type = "forbidden"
+source_modules = ["rcl.registry"]
+forbidden_modules = [
+    "rcl.environments", "rcl.controllers", "rcl.experiments", "rcl.metrics", "rcl.analytics",
+    "rcl.persistence", "rcl.api", "rcl.frontend",
 ]
 
 [[tool.importlinter.contracts]]
@@ -92,7 +101,8 @@ layers = [
     "rcl.frontend",
     "rcl.api",
     "rcl.experiments",
-    "rcl.analytics | rcl.registry | rcl.persistence | rcl.metrics",
+    "rcl.analytics | rcl.persistence | rcl.metrics",
     "rcl.environments | rcl.controllers",
+    "rcl.registry",
     "rcl.core",
 ]
