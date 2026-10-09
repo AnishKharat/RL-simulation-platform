@@ -159,18 +159,22 @@ class TaskSpec(_Spec):
 class TrainConfig(_Spec):
     """Training budget. Classical controllers ignore it. Algorithm hyperparameters (learning
     rate, gamma, network size, ...) are NOT here: they are the controller's own `params`,
-    validated by its registry params model."""
+    validated by its registry params model. `n_envs` is how many environments the controller
+    builds from the `env_factory` for vectorised training."""
 
     total_timesteps: int = Field(gt=0)
     seed: int = 0
+    n_envs: int = Field(default=1, ge=1)
 
 
 class TrainResult(_Spec):
-    """Outcome of `BaseController.train`. Classical controllers return timesteps=0."""
+    """Outcome of `BaseController.train`. Classical controllers return timesteps=0.
+    `curve` is the learning curve as `(timestep, mean_episode_return)` pairs, in order."""
 
     timesteps: int = Field(ge=0)
     wall_time_s: float = Field(default=0.0, ge=0)
     metrics: dict[str, float] = Field(default_factory=dict)
+    curve: tuple[tuple[int, float], ...] = ()
 
 
 @dataclass(frozen=True)

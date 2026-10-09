@@ -3,6 +3,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from pydantic import ValidationError
 
 from rcl.core.controller import Action, BaseController
 from rcl.core.types import (
@@ -12,6 +13,7 @@ from rcl.core.types import (
     EnvSpec,
     LinearModel,
     TrainConfig,
+    TrainResult,
 )
 
 
@@ -48,13 +50,32 @@ class _Const(BaseController):
 
 
 def test_default_train_is_noop() -> None:
-    res = _Const().train(None, TrainConfig(total_timesteps=1))  # type: ignore[arg-type]
+    res = _Const().train(lambda: None, TrainConfig(total_timesteps=1))  # type: ignore[arg-type,return-value]
     assert res.timesteps == 0
 
 
 def test_evaluate_is_not_part_of_the_contract() -> None:
     assert not hasattr(BaseController, "evaluate")
     assert "evaluate" not in BaseController.__abstractmethods__
+
+
+def test_train_takes_env_factory_and_save_gets_directory(tmp_path: Path) -> None:
+    import inspect
+
+    assert list(inspect.signature(BaseController.train).parameters) == [
+        "self",
+        "env_factory",
+        "config",
+    ]
+    calls: list[int] = []
+    res = _Const().train(lambda: calls.append(1), TrainConfig(total_timesteps=1, n_envs=3))  # type: ignore[arg-type,return-value]
+    assert res.curve == () and calls == []  # classical default never builds an env
+    _Const().save(tmp_path)  # caller-created directory
+    assert TrainConfig(total_timesteps=1).n_envs == 1
+    with pytest.raises(ValidationError):
+        TrainConfig(total_timesteps=1, n_envs=0)
+    r = TrainResult(timesteps=2, curve=((1, 0.5), (2, 1.0)))
+    assert TrainResult.model_validate_json(r.model_dump_json()) == r
 
 
 def test_default_reset_is_noop() -> None:

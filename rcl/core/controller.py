@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -46,6 +47,9 @@ class BaseController(ABC):
       the first `predict`) to clear per-episode internal state (PID integrator and previous
       error, RNN hidden state, MPC warm start). Default: no-op. It must not touch learned
       parameters.
+    * Observation normalisation (RL) is the controller's own state: it is fitted in `train`,
+      saved/loaded with the controller, and applied inside `predict`, which always receives the
+      RAW observation from the environment (ADR 0015). The rollout never normalises.
     * `predict(obs, deterministic=True)` is a pure function of the controller's state and
       `obs`; any stochasticity must come from RNGs seeded via `configure`/`train` config,
       never from global RNG state.
@@ -53,7 +57,8 @@ class BaseController(ABC):
       `rollout(env, controller, n_episodes, seed)` (episode i resets the env with `seed + i`,
       steps `predict` until terminated/truncated, returns one `EpisodeTrajectory` each), so
       every controller is evaluated identically (ADR 0013).
-    * `save(path)`/`load(path)` round-trip: a loaded controller predicts identically.
+    * `save(path)`/`load(path)` round-trip through a caller-created directory: a loaded
+      controller predicts identically.
     """
 
     metadata: ClassVar[ControllerMetadata]
@@ -74,14 +79,20 @@ class BaseController(ABC):
     def predict(self, obs: np.ndarray, deterministic: bool = True) -> Action:
         """Map one observation to one action valid for the configured action space."""
 
-    def train(self, env: BaseEnvironment, config: TrainConfig) -> TrainResult:
-        """Learn from `env` within `config` budget. Default (classical): no-op."""
+    def train(self, env_factory: Callable[[], BaseEnvironment], config: TrainConfig) -> TrainResult:
+        """Learn within the `config` budget. Default (classical): no-op.
+
+        `env_factory` builds a fresh environment (same wrapper stack as evaluation, ADR 0015)
+        on each call; the controller calls it `config.n_envs` times (vectorised training) and
+        owns/closes what it creates. Seeding comes from `config.seed`.
+        """
         return TrainResult(timesteps=0)
 
     @abstractmethod
     def save(self, path: Path) -> None:
-        """Persist learned/tuned state to `path`."""
+        """Persist state into `path`, a directory CREATED BY THE CALLER (may be empty); the
+        controller fills it with whatever it needs (e.g. `model.zip`, `vecnorm.pkl`)."""
 
     @abstractmethod
     def load(self, path: Path) -> None:
-        """Restore state written by `save`."""
+        """Restore from a directory written by `save`."""

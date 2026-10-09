@@ -48,15 +48,16 @@ sequenceDiagram
     REG-->>EM: Entry (cls, metadata, params_model)
     EM->>EM: entry.validate_params(raw) -> resolved params, check action-space compatibility
     EM->>EM: derive seeds from experiment.seed
-    EM->>ENV: cls(**validated_params)
+    EM->>ENV: cls(**validated_params) (evaluation env; training uses env_factory with the same wrapper stack)
     EM->>ENV: get_env_spec(), get_linearization()
     EM->>CTL: cls(), then configure(env_spec, validated_params, linear_model)
     Note over EM,CTL: linear_model is in observation coordinates, None if the env offers none
 
     opt controller metadata requires_training
-        EM->>CTL: train(env, TrainConfig)
-        CTL->>ENV: reset(seed) / step(action) ...
-        CTL-->>EM: TrainResult (curves, checkpoint)
+        EM->>CTL: train(env_factory, TrainConfig(total_timesteps, seed, n_envs))
+        CTL->>ENV: env_factory() x n_envs, then reset(seed) / step(action) ...
+        CTL-->>EM: TrainResult (timesteps, curve)
+        EM->>CTL: save(checkpoint_dir) (dir created by EM; controller fills it)
         EM->>DB: save training artifact refs
     end
 
