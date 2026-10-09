@@ -31,7 +31,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☐ Metric definitions doc
 - ☑ Import-linter rules for dependency layers
 - ☑ Spike: SB3 trains on a custom env
-- ☐ Spike: FastAPI background job
+- ☑ Spike: FastAPI background job
 - ☐ ADRs (one commit each)
 - ☐ Architecture review iteration 1 → revisions
 - ☐ Architecture review iteration 2 → revisions
