@@ -58,12 +58,13 @@ sequenceDiagram
         EM->>DB: save training artifact refs
     end
 
-    EM->>CTL: evaluate(env, n_episodes, eval_seed)
+    EM->>EM: rollout(env, controller, n_episodes, eval_seed)
     loop each episode i, reset seed = eval_seed + i
-        CTL->>ENV: reset(seed)
-        CTL->>ENV: step(predict(obs)) until terminated or truncated
+        EM->>ENV: reset(seed)
+        EM->>CTL: predict(obs)
+        EM->>ENV: step(action) until terminated or truncated
     end
-    CTL-->>EM: list of EpisodeTrajectory
+    Note over EM: rollout() is the single shared evaluation loop (ADR 0013); returns list of EpisodeTrajectory
 
     EM->>MET: compute(trajectory, task_spec) per episode
     MET-->>EM: MetricResult values
@@ -82,6 +83,7 @@ sequenceDiagram
 - One `experiment.seed` is stored in the config. The manager derives independent seeds with `numpy.random.SeedSequence(seed).spawn(...)`: one for env construction, one for training, one for evaluation.
 - Evaluation episode `i` resets with `eval_seed + i` (or the i-th spawned child), so every controller in a benchmark sees identical initial states (§6.8).
 - No global RNG is used; seeds are passed explicitly to `reset`, `train`, and `evaluate`. The derived seeds are written to the Run row.
+- Evaluation is the experiments-layer function `rollout(env, controller, n_episodes, seed) -> list[EpisodeTrajectory]` (contract only, not yet implemented): it is the only evaluation loop, takes any `BaseController`, resets episode `i` with `seed + i`, calls `predict` until `terminated or truncated`, records true states via `env.get_state()` and judges success with the env's `TaskSpec`.
 
 ## Failure path
 

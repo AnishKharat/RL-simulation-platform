@@ -5,13 +5,11 @@ import numpy as np
 import pytest
 
 from rcl.core.controller import Action, BaseController
-from rcl.core.environment import BaseEnvironment
 from rcl.core.types import (
     ActionSpaceKind,
     ControllerFamily,
     ControllerMetadata,
     EnvSpec,
-    EpisodeTrajectory,
     TrainConfig,
 )
 
@@ -35,9 +33,6 @@ class _Const(BaseController):
     def predict(self, obs: np.ndarray, deterministic: bool = True) -> Action:
         return np.zeros(1)
 
-    def evaluate(self, env: BaseEnvironment, n_episodes: int, seed: int) -> list[EpisodeTrajectory]:
-        return []
-
     def save(self, path: Path) -> None:
         pass
 
@@ -48,3 +43,8 @@ class _Const(BaseController):
 def test_default_train_is_noop() -> None:
     res = _Const().train(None, TrainConfig(total_timesteps=1))  # type: ignore[arg-type]
     assert res.timesteps == 0
+
+
+def test_evaluate_is_not_part_of_the_contract() -> None:
+    assert not hasattr(BaseController, "evaluate")
+    assert "evaluate" not in BaseController.__abstractmethods__
