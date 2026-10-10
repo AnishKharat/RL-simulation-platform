@@ -14,7 +14,10 @@ dependencies = ["pydantic>=2", "numpy>=2", "gymnasium", "sqlalchemy"]
 rl = ["stable-baselines3"]
 api = ["fastapi", "uvicorn"]
 frontend = ["streamlit", "plotly", "httpx"]
-dev = ["pytest", "ruff", "mypy", "import-linter", "pre-commit", "httpx"]
+dev = [
+    "pytest", "ruff", "mypy", "import-linter", "pre-commit", "httpx",
+    "stable-baselines3", "fastapi", "uvicorn", "streamlit", "plotly",
+]
 
 [tool.setuptools.packages.find]
 include = ["rcl*"]

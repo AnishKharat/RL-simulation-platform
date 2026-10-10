@@ -4,8 +4,8 @@ import pytest
 from rcl.controllers.classical.pid import PID
 from rcl.core.config import ExperimentConfig
 from rcl.environments.cartpole import CartPole
-from rcl.experiments import derive_seeds, execute, rollout
-from rcl.registry import ParamValidationError, UnknownIdError, discover
+from rcl.experiments import ConfigError, derive_seeds, execute, rollout
+from rcl.registry import discover
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -79,16 +79,18 @@ def test_same_seed_reproduces_and_seed_override_changes():
 
 
 def test_execute_rejects_bad_configs_before_work():
-    with pytest.raises(ValueError, match="not compatible"):
-        execute(cfg(env="cartpole_discrete"))
-    with pytest.raises(UnknownIdError):
-        execute(cfg(env="nope"))
-    with pytest.raises(ParamValidationError):
-        execute(cfg(controller={"id": "pid", "params": {"kq": 1}}))
-    with pytest.raises(ValueError, match="training"):
-        execute(cfg(ctl="ppo"))
-    with pytest.raises(ValueError, match="Phase 4"):
-        execute(cfg(perturbations=[{"id": "noise"}]))
+    def types(**kw):
+        with pytest.raises(ConfigError) as exc:
+            execute(cfg(**kw))
+        return {(tuple(e["loc"]), e["type"]) for e in exc.value.errors}
+
+    assert types(env="cartpole_discrete") == {(("controller", "id"), "incompatible")}
+    assert types(env="nope") == {(("environment", "id"), "unknown_id")}
+    bad = types(controller={"id": "pid", "params": {"kq": 1}})
+    assert bad == {(("controller", "params", "kq"), "extra_forbidden")}
+    assert types(ctl="ppo") == {(("training",), "missing")}
+    assert types(perturbations=[{"id": "noise"}]) == {(("perturbations",), "unsupported")}
+    assert len(types(env="nope", ctl="nope")) == 2  # all problems reported at once
 
 
 def test_execute_ppo_trains_reports_and_checkpoints(tmp_path):

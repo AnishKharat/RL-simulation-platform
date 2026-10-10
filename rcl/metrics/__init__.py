@@ -1,7 +1,9 @@
 """Pure metric functions over trajectories. Definitions: rcl/metrics/DEFINITIONS.md."""
 
 from rcl.metrics.metrics import (
+    METRIC_INFO,
     METRICS,
+    MetricInfo,
     MetricValue,
     aggregate,
     angle_error,
@@ -11,7 +13,9 @@ from rcl.metrics.metrics import (
 )
 
 __all__ = [
+    "METRIC_INFO",
     "METRICS",
+    "MetricInfo",
     "MetricValue",
     "aggregate",
     "angle_error",
