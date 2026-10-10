@@ -72,3 +72,37 @@ def test_non_zero_setpoint_and_wrapping():
 def test_non_finite_undefined():
     m = settling_time(traj([1.0, np.nan, 0.0]), task())
     assert m.status == "undefined" and math.isnan(m.value) and "settled" in m.companions
+
+
+def test_rise_time_interpolates_between_samples():
+    from rcl.metrics.dynamics import rise_time
+
+    # p = [0, .2, .6, .95, 1]: t10 = 0.05, t90 = 0.2 + (0.9-0.6)/0.35 * 0.1
+    m = rise_time(traj([1.0, 0.8, 0.4, 0.05, 0.0]), task())
+    assert m.value == pytest.approx(0.2 + 0.3 / 0.35 * 0.1 - 0.05) and m.status == "ok"
+
+
+def test_rise_time_censored_when_90_percent_not_reached():
+    from rcl.metrics.dynamics import rise_time
+
+    m = rise_time(traj([1.0, 0.8, 0.6, 0.4]), task())  # p tops out at 0.6; t10 = 0.05
+    assert m.status == "censored" and m.value == pytest.approx(1.0 - 0.05)
+    none = rise_time(traj([1.0, 0.99, 0.98]), task())  # never even 10%
+    assert none.status == "censored" and none.value == pytest.approx(1.0)
+
+
+def test_rise_time_undefined_below_step_floor_and_for_non_finite():
+    from rcl.metrics.dynamics import rise_time
+
+    small = rise_time(traj([0.01, 0.0, 0.0]), task())
+    assert small.status == "undefined" and math.isnan(small.value)
+    assert rise_time(traj([1.0, np.nan]), task()).status == "undefined"
+
+
+def test_rise_time_non_zero_setpoint_and_negative_step():
+    from rcl.metrics.dynamics import rise_time
+
+    up = rise_time(traj([0.0, 0.2, 1.0, 1.8, 2.0]), task(setpoint=2.0))  # p = theta / 2
+    assert up.value == pytest.approx(0.2)
+    down = rise_time(traj([2.0, 1.8, 1.0, 0.2, 0.0]), task(setpoint=0.0))
+    assert down.value == pytest.approx(up.value)  # symmetric step, same progress curve

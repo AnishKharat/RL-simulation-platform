@@ -65,3 +65,41 @@ def settling_time(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
         unit=unit,
         companions={"settled": (1.0, "bool")},
     )
+
+
+def _progress(traj: EpisodeTrajectory, task: TaskSpec) -> np.ndarray | None:
+    """Normalised step progress p_k (0 at the start, 1 at the setpoint), or None if S < S_min."""
+    _, s, w, w_ref = _geometry(traj, task)
+    if s < task.step_floor:
+        return None
+    return np.asarray(w @ w_ref / s**2)
+
+
+def _first_crossing(p: np.ndarray, level: float, dt: float) -> float | None:
+    """Time of the first sample where p >= level, linearly interpolated; None if never."""
+    hits = np.flatnonzero(p >= level)
+    if len(hits) == 0:
+        return None
+    k = int(hits[0])
+    if k == 0:
+        return 0.0
+    return float((k - 1 + (level - p[k - 1]) / (p[k] - p[k - 1])) * dt)
+
+
+def rise_time(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
+    """Time from 10% to 90% of the commanded step; undefined if the step is below the floor.
+
+    If 90% is never reached the value is T_max - t_10 (T_max if 10% is not reached either),
+    status censored.
+    """
+    unit = "s"
+    if not _check(traj):
+        return _undefined("rise_time", unit)
+    p = _progress(traj, task)
+    if p is None:
+        return _undefined("rise_time", unit)
+    t10, t90 = _first_crossing(p, 0.1, traj.dt), _first_crossing(p, 0.9, traj.dt)
+    if t90 is not None and t10 is not None:
+        return MetricValue(name="rise_time", value=t90 - t10, unit=unit)
+    t_max = _t_max(traj, task)
+    return MetricValue(name="rise_time", value=t_max - (t10 or 0.0), unit=unit, status="censored")
