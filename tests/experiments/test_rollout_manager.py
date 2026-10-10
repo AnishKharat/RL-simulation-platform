@@ -128,3 +128,19 @@ def test_versions_record_the_simulator_when_installed():
 
     r = execute(cfg())
     assert r.record.versions["pybullet"] == importlib.metadata.version("pybullet")
+
+
+def test_eval_wrapper_wraps_evaluation_only_and_changes_nothing():
+    from rcl.core.environment import EnvWrapper
+
+    steps = []
+
+    class Counter(EnvWrapper):
+        def step(self, action):
+            steps.append(1)
+            return super().step(action)
+
+    plain, wrapped = execute(cfg()), execute(cfg(), eval_wrapper=Counter)
+    assert wrapped.metrics == plain.metrics and len(steps) == sum(
+        t.n_steps for t in wrapped.trajectories
+    )
