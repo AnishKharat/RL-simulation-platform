@@ -43,20 +43,32 @@ class MlflowTracker:
         checkpoint_dir: Path | None,
     ) -> str:
         from mlflow import MlflowClient
+        from mlflow.entities import Metric
 
         client = MlflowClient(tracking_uri=self._uri)
         exp = client.get_experiment_by_name(self._experiment)
-        exp_id = exp.experiment_id if exp else client.create_experiment(self._experiment)
+        try:
+            exp_id = exp.experiment_id if exp else client.create_experiment(self._experiment)
+        except Exception:  # two jobs created it at once: the other one won, look it up again
+            found = client.get_experiment_by_name(self._experiment)
+            if found is None:
+                raise
+            exp_id = found.experiment_id
         run = client.create_run(exp_id, run_name=run_name)
         run_id: str = run.info.run_id
+        status = "FINISHED"
         try:
             for key, text in params.items():
                 client.log_param(run_id, key, text)
             now = int(time.time() * 1000)
-            for step, value in curve:
-                client.log_metric(run_id, "train/mean_episode_return", value, now, step)
+            points = [Metric("train/mean_episode_return", v, now, step) for step, v in curve]
+            for i in range(0, len(points), 1000):  # MLflow accepts at most 1000 metrics per batch
+                client.log_batch(run_id, metrics=points[i : i + 1000])
             if checkpoint_dir is not None and checkpoint_dir.is_dir():
                 client.log_artifacts(run_id, str(checkpoint_dir), "checkpoint")
+        except Exception:
+            status = "FAILED"
+            raise
         finally:
-            client.set_terminated(run_id)
+            client.set_terminated(run_id, status=status)
         return run_id

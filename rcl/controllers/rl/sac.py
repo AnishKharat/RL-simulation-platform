@@ -80,13 +80,17 @@ class SAC(BaseController):
             raise RuntimeError("configure() must be called before train()")
         p, total = self._p, config.total_timesteps
         curve: list[tuple[int, float]] = []
+        every, last = max(1, total // 200), [-total]
 
         class Hook(BaseCallback):
             stop = False
 
             def _on_rollout_end(self) -> None:
+                # Off-policy algorithms end a "rollout" every train_freq steps: keep the curve to
+                # about 200 points however long the budget is.
                 buf = self.model.ep_info_buffer
-                if buf:
+                if buf and self.num_timesteps - last[0] >= every:
+                    last[0] = self.num_timesteps
                     curve.append((self.num_timesteps, float(np.mean([e["r"] for e in buf]))))
                 if progress is not None and progress(self.num_timesteps, total):
                     self.stop = True

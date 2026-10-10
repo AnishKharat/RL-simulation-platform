@@ -48,14 +48,15 @@ def _check(traj: EpisodeTrajectory) -> bool:
     return all(np.isfinite(a).all() for a in (traj.states, traj.actions, traj.rewards))
 
 
-def _undefined(name: str, unit: str, companions: tuple[str, ...] = ()) -> MetricValue:
+def _undefined(name: str, unit: str, companions: dict[str, str] | None = None) -> MetricValue:
+    """NaN result; ``companions`` maps each companion name to its own unit."""
     nan = math.nan
     return MetricValue(
         name=name,
         value=nan,
         unit=unit,
         status="undefined",
-        companions={c: (nan, unit) for c in companions},
+        companions={c: (nan, u) for c, u in (companions or {}).items()},
     )
 
 
@@ -75,7 +76,7 @@ def angle_error(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
     """RMS of e_k = ||wrap(y(x_k) - y_ref)||_2 over k = 0..T; companion ``max_abs_angle_error``."""
     unit = task.output_unit or ""
     if not _check(traj):
-        return _undefined("angle_error", unit, ("max_abs_angle_error",))
+        return _undefined("angle_error", unit, {"max_abs_angle_error": unit})
     idx = list(task.error_state_indices)
     d = traj.states[:, idx] - np.asarray(task.y_ref)
     wrapped = [i for i, s in enumerate(idx) if s in task.wrap_indices]
@@ -112,7 +113,9 @@ def aggregate(per_episode: list[list[MetricValue]]) -> list[MetricValue]:
         ms = [ep[k] for ep in per_episode if ep[k].status != "undefined"]
         first = per_episode[0][k]
         if not ms:
-            out.append(_undefined(first.name, first.unit, tuple(first.companions)))
+            out.append(
+                _undefined(first.name, first.unit, {c: u for c, (_, u) in first.companions.items()})
+            )
             continue
         out.append(
             MetricValue(

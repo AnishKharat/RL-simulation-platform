@@ -139,7 +139,7 @@ class Repository:
         )
 
     def fail_orphans(self) -> int:
-        """Mark runs left queued/running by a previous process as failed (server restart)."""
+        """Mark runs and benchmark runs left queued/running by a previous process as failed."""
         with self._session.begin() as s:
             runs = s.scalars(select(RunRow).where(RunRow.status.in_(("queued", "running"))))
             n = 0
@@ -147,6 +147,13 @@ class Repository:
                 r.status, r.finished_at = "failed", _now()
                 r.error = {"type": "interrupted", "message": "server restarted", "stage": r.stage}
                 r.error_stage = r.stage
+                n += 1
+            benches = s.scalars(
+                select(BenchmarkRunRow).where(BenchmarkRunRow.status.in_(("queued", "running")))
+            )
+            for b in benches:
+                b.status, b.finished_at = "failed", _now()
+                b.error = {"type": "interrupted", "message": "server restarted"}
                 n += 1
         return n
 
@@ -413,7 +420,12 @@ class Repository:
                 RunRow.status == "done",
                 MetricResultRow.episode_id.is_(None),
             )
-            .order_by(ExperimentRow.env_id, ExperimentRow.controller_id, RunRow.seed)
+            .order_by(
+                ExperimentRow.env_id,
+                ExperimentRow.controller_id,
+                RunRow.seed,
+                MetricResultRow.metric_name,  # pins report / CSV row order
+            )
         )
         keys = (
             "env_id",

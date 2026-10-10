@@ -102,3 +102,18 @@ def test_mlflow_tracker_logs_params_curve_and_checkpoint_files(tmp_path):
     hist = client.get_metric_history(run_id, "train/mean_episode_return")
     assert [(m.step, m.value) for m in sorted(hist, key=lambda m: m.step)] == [(10, 1.0), (20, 2.5)]
     assert [a.path for a in client.list_artifacts(run_id, "checkpoint")] == ["checkpoint/model.zip"]
+
+
+def test_mlflow_tracker_reuses_the_experiment_and_batches_long_curves(tmp_path):
+    pytest.importorskip("mlflow")
+    from mlflow import MlflowClient
+
+    uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
+    tracker = MlflowTracker(uri, experiment="rcl-test")
+    long_curve = [(i, float(i)) for i in range(2500)]  # more than one 1000-metric batch
+    first = tracker.log_training(run_name="a", params={}, curve=long_curve, checkpoint_dir=None)
+    second = tracker.log_training(run_name="b", params={}, curve=[], checkpoint_dir=None)
+    client = MlflowClient(tracking_uri=uri)
+    assert client.get_run(first).info.experiment_id == client.get_run(second).info.experiment_id
+    hist = client.get_metric_history(first, "train/mean_episode_return")
+    assert len(hist) == 2500

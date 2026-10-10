@@ -110,9 +110,16 @@ def _spec_lines(spec: dict[str, Any]) -> list[str]:
 
 
 def build_report(
-    title: str, spec: dict[str, Any], summary: list[SummaryRow], infos: list[MetricInfo]
+    title: str,
+    spec: dict[str, Any],
+    summary: list[SummaryRow],
+    infos: list[MetricInfo],
+    skipped: list[dict[str, str]] | None = None,
 ) -> Report:
-    """Render the comparison: per environment and metric a table plus a chart."""
+    """Render the comparison: per environment and metric a table plus a chart.
+
+    ``skipped`` lists incompatible pairs (``env_id``, ``controller_id``, ``reason``) so the
+    reader can see which cells of the grid were not run."""
     plots: dict[str, str] = {}
     md = [f"# {title}", "", "## Setup", "", *_spec_lines(spec), ""]
     body = [f"<h1>{html.escape(title)}</h1>", "<h2>Setup</h2><ul>"]
@@ -159,6 +166,11 @@ def build_report(
         "`censored` counts runs whose value is a bound (for example never settled); they are included in the mean.",
         "Rows marked `<5 seeds` have wide intervals: no significance claim should be made from them.",
     ]
+    if skipped:
+        lines = [f"{k['controller_id']} on {k['env_id']}: {k['reason']}" for k in skipped]
+        md += ["## Skipped pairs", "", *[f"- {line}" for line in lines], ""]
+        body += ["<h2>Skipped pairs</h2><ul>"] + [f"<li>{html.escape(x)}</li>" for x in lines]
+        body.append("</ul>")
     md += ["## Notes", "", *[f"- {n}" for n in notes], ""]
     body += ["<h2>Notes</h2><ul>"] + [f"<li>{html.escape(n)}</li>" for n in notes] + ["</ul>"]
     style = (

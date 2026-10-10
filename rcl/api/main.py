@@ -188,7 +188,13 @@ def create_app(
         found = request.app.state.repo.get_suite(suite_id)
         if found is None:
             raise HTTPException(404, f"unknown benchmark {suite_id!r}")
-        return found  # type: ignore[no-any-return]
+        try:  # plan() is deterministic, so skipped pairs are recomputed instead of stored
+            _, skipped = plan(
+                BenchmarkSpec.model_validate(found["spec"]), request.app.state.registry
+            )
+        except (ConfigError, ValueError):
+            skipped = []  # e.g. an id registered when the suite ran is gone now
+        return {**found, "skipped": [vars(k) for k in skipped]}
 
     @app.get("/benchmarks/{suite_id}/summary", response_model=list[SummaryOut])
     def benchmark_summary(

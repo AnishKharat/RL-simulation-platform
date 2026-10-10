@@ -70,3 +70,15 @@ def test_paired_difference_uses_common_valid_seeds_only():
     assert d.mean == pytest.approx(2.5) and d.unit == "u"  # (5-3, 7-4)
     none = paired_difference(rows, "e", "m", "a", "zzz")
     assert none.n_valid == 0 and math.isnan(none.mean)
+
+
+def test_paired_difference_is_censored_if_either_side_is():
+    from rcl.analytics import paired_difference
+
+    rows = [
+        row("e", "a", 0, "m", 5.0, "censored"),
+        row("e", "b", 0, "m", 3.0),
+        row("e", "a", 1, "m", 7.0),
+        row("e", "b", 1, "m", 4.0),
+    ]
+    assert paired_difference(rows, "e", "m", "a", "b").n_censored == 1

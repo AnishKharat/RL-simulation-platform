@@ -138,6 +138,7 @@ class BenchmarkDetail(BenchmarkSummaryItem):
     spec: dict[str, Any]
     benchmark_runs: list[BenchmarkRunOut]
     experiments: list[BenchmarkCell]
+    skipped: list[SkippedPair] = []
 
 
 class SummaryOut(BaseModel):

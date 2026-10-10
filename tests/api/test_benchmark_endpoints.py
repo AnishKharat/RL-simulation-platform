@@ -54,7 +54,9 @@ def test_summary_has_cis_counts_and_json_safe_nulls(client):
         assert r["ci_low"] <= r["mean"] <= r["ci_high"]
     assert {r["ci_method"] for r in rows if r["metric_name"] == "settling_time"} == {"bootstrap"}
     assert client.get(f"/benchmarks/{suite}/summary", params={"env_id": "nope"}).json() == []
-    assert len(client.get(f"/benchmarks/{suite}/summary").json()) >= len(rows)
+    assert len(client.get(f"/benchmarks/{suite}/summary").json()) == len(
+        rows
+    )  # skipped env has no rows
 
 
 def test_paired_difference_and_not_found(client):
@@ -76,3 +78,13 @@ def test_invalid_specs_are_422_with_body_locs_and_nothing_is_created(client):
     assert post(client, environments=[{"id": "cartpole_discrete"}]).status_code == 422
     assert post(client, seeds=[1, 1]).status_code == 422  # schema-level
     assert client.get("/benchmarks").json() == []
+
+
+def test_detail_lists_skipped_pairs_after_the_post_response(client):
+    suite = post(client).json()["suite_id"]
+    wait(client, suite)
+    skipped = client.get(f"/benchmarks/{suite}").json()["skipped"]
+    assert {(k["env_id"], k["controller_id"]) for k in skipped} == {
+        ("cartpole_discrete", "pid"),
+        ("cartpole_discrete", "lqr"),
+    }

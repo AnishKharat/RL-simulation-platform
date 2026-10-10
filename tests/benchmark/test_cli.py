@@ -92,3 +92,30 @@ def test_module_entry_point_runs_as_a_subprocess(tmp_path):
     )  # fmt: skip
     assert r.returncode == 0, r.stderr
     assert "| pid |" in r.stdout and (out / "report.md").exists()
+
+
+def test_report_lists_skipped_pairs(tmp_path):
+    out = tmp_path / "out"
+    args = ["--envs", "cartpole", "cartpole_discrete", "--controllers", "pid", "--seeds", "2"]
+    assert main([*args, "--episodes", "1", "--out", str(out)]) == 0
+    assert "- pid on cartpole_discrete:" in (out / "report.md").read_text(encoding="utf-8")
+
+
+def test_grid_defaults_come_from_the_registry():
+    import argparse
+
+    from rcl.benchmark.cli import spec_from_args
+    from rcl.registry import discover, get_registry
+
+    discover()
+    ns = argparse.Namespace(
+        spec=None, name="n", envs=None, controllers=None, seeds=2, episodes=1, timesteps=64
+    )
+    spec = spec_from_args(ns, get_registry())
+    assert [e.id for e in spec.environments] == [
+        e.id for e in get_registry().entries("environment")
+    ]
+    assert [c.id for c in spec.controllers] == [c.id for c in get_registry().entries("controller")]
+    assert (
+        spec.training is not None and spec.training.total_timesteps == 64
+    )  # RL controllers present
