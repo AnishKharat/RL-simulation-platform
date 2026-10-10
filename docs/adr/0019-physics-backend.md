@@ -50,3 +50,15 @@ Physics. Today there is no physics package; CartPole and the pendulum integrate 
 - **`PhysicsBackend` as an ABC with shared code:** a Protocol keeps `core` free of behaviour (ADR 0004).
 - **Selecting the backend per experiment (config field):** would make `EnvMetadata.physics_backend` instance-level and
   add a config axis to every benchmark. Not needed for Phase 3.
+
+## Amendment after the determinism spike (same review)
+`spikes/pybullet_determinism/README.md`: seeded runs are bit-identical across fresh clients, `resetSimulation` reuse
+and processes, but writing coordinates back (`resetJointState` / `resetBase*`) clears contact and solver caches. The
+continuation then diverges from the run the state was read from (max diff 63 under wheel contact), while native
+`saveState`/`restoreState` is exact. The stub contract therefore says:
+- `set_state` writes a `get_state`-layout vector and clears caches. It is deterministic as a procedure (fine for
+  seeded initial states) and NOT an exact continuation.
+- `save()` / `restore(handle)` give exact native snapshots.
+- Finite-difference linearisation evaluates each perturbation with the same procedure: `restore(base)`,
+  `set_state(x +/- eps)`, then step. Contact-rich robots may give noisy Jacobians, so the balance robot's LQR is
+  validated at implementation time.

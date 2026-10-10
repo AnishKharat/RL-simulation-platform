@@ -17,10 +17,13 @@ therefore break discovery, and with it the API, the CLI and the dashboard, on ev
    imports the simulator at top level. It registers only if the simulator is importable:
    ```python
    _AVAILABLE = importlib.util.find_spec("pybullet") is not None
-   _register = register_environment("balance_bot", params=BalanceBotParams) if _AVAILABLE else (lambda c: c)
+   _register = (
+       register_environment("balance_bot", params=BalanceBotParams) if _AVAILABLE else (lambda c: c)
+   )
+
 
    @_register
-   class BalanceBot(BaseEnvironment): ...   # imports pybullet inside __init__ / the backend
+   class BalanceBot(BaseEnvironment): ...  # imports pybullet inside __init__ / the backend
    ```
    - On machines without the extra, the robot simply is not in the registry: not listed in the API or dashboard, and
      `unknown_id` (422) if requested.
