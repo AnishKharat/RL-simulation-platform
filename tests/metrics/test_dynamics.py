@@ -106,3 +106,20 @@ def test_rise_time_non_zero_setpoint_and_negative_step():
     assert up.value == pytest.approx(0.2)
     down = rise_time(traj([2.0, 1.8, 1.0, 0.2, 0.0]), task(setpoint=0.0))
     assert down.value == pytest.approx(up.value)  # symmetric step, same progress curve
+
+
+def test_overshoot_percent_of_step():
+    from rcl.metrics.dynamics import overshoot
+
+    assert overshoot(traj([1.0, 0.5, -0.2, 0.0]), task()).value == pytest.approx(20.0)
+    # non-zero initial error and setpoint: p = theta / 2, peak 2.5 / 2
+    assert overshoot(traj([0.0, 1.0, 2.5, 2.0]), task(setpoint=2.0)).value == pytest.approx(25.0)
+
+
+def test_overshoot_zero_when_monotone_and_undefined_for_tiny_step():
+    from rcl.metrics.dynamics import overshoot
+
+    m = overshoot(traj([1.0, 0.5, 0.1, 0.0]), task())
+    assert m.value == 0.0 and m.status == "ok" and m.unit == "%"
+    assert overshoot(traj([0.01, 0.0]), task()).status == "undefined"
+    assert overshoot(traj([1.0, np.inf]), task()).status == "undefined"

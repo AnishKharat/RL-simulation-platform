@@ -103,3 +103,14 @@ def rise_time(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
         return MetricValue(name="rise_time", value=t90 - t10, unit=unit)
     t_max = _t_max(traj, task)
     return MetricValue(name="rise_time", value=t_max - (t10 or 0.0), unit=unit, status="censored")
+
+
+def overshoot(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
+    """Percent of the step size by which the output exceeds the setpoint (0 if it never does);
+    undefined if the step is below the floor."""
+    if not _check(traj):
+        return _undefined("overshoot", "%")
+    p = _progress(traj, task)
+    if p is None:
+        return _undefined("overshoot", "%")
+    return MetricValue(name="overshoot", value=100.0 * max(0.0, float(p.max()) - 1.0), unit="%")
