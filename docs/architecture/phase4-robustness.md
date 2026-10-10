@@ -84,3 +84,5 @@ user marks `train`/`both`), then the same trained policy is evaluated at every l
 True external force on a body (pitch push on the balance bot, wind on a link) needs an environment hook (an
 optional `apply_disturbance`). Proposal: do NOT add it; `disturbance` acts through the actuated input channel
 (CartPole cart force, balance-bot wheel torque), saturating at the actuator limit. See OPEN_QUESTIONS.
+
+Decision (user, 2026-10-11): the disturbance is added to the clipped command and the environment then clips the sum again, i.e. it is applied BEFORE the environment clipping and saturates at the actuator limit. Applying it after the environment clip would need an environment hook, which was rejected. Limitation documented in docs/benchmarks/phase4/README.md.
