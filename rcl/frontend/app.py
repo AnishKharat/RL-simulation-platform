@@ -106,7 +106,14 @@ def show_results(run: dict[str, Any]) -> None:
         st.plotly_chart(plots.curve_figure(run["train_curve"]))
     st.subheader("Trajectory")
     episode = st.selectbox("Episode", [e["index"] for e in run["episodes"]], key="episode")
-    st.plotly_chart(plots.trajectory_figure(client.trajectory(run["run_id"], episode)))
+    traj = client.trajectory(run["run_id"], episode)
+    signals = st.multiselect(
+        "Signals",
+        plots.signal_names(traj),
+        default=plots.default_signals(traj),
+        key=f"signals-{run['run_id']}",
+    )
+    st.plotly_chart(plots.trajectory_figure(traj, signals))
 
 
 def main() -> None:

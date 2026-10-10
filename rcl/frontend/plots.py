@@ -17,25 +17,47 @@ def _names(labels: list[str], units: list[str], n: int, fallback: str) -> list[s
     return out
 
 
-def trajectory_figure(t: dict[str, Any]) -> go.Figure:
-    """One stacked, x-shared panel per state component, per action component and the reward."""
+def _signals(t: dict[str, Any]) -> list[tuple[str, list[float], bool]]:
+    """Every plottable signal as (title, values, is_step_input); actions and rewards have T
+    samples (step k acts at time[k]), states T+1."""
     n_state, n_action = len(t["states"][0]), len(t["actions"][0]) if t["actions"] else 0
-    titles = [
-        *_names(t["state_labels"], t["state_units"], n_state, "state"),
-        *_names(t["action_labels"], t["action_units"], n_action, "action"),
-        "reward",
+    states = _names(t["state_labels"], t["state_units"], n_state, "state")
+    actions = _names(t["action_labels"], t["action_units"], n_action, "action")
+    return [
+        *[(name, [s[i] for s in t["states"]], False) for i, name in enumerate(states)],
+        *[(name, [a[j] for a in t["actions"]], True) for j, name in enumerate(actions)],
+        ("reward", list(t["rewards"]), False),
     ]
-    fig = make_subplots(rows=len(titles), cols=1, shared_xaxes=True, subplot_titles=titles)
+
+
+def signal_names(t: dict[str, Any]) -> list[str]:
+    """Titles of all plottable signals, in panel order (states, actions, reward)."""
+    return [name for name, _, _ in _signals(t)]
+
+
+def default_signals(t: dict[str, Any], limit: int = 9) -> list[str]:
+    """All signals if there are at most ``limit``; otherwise the task outputs are not known
+    here, so: the first four states, every action and the reward (many-joint robots)."""
+    names = signal_names(t)
+    if len(names) <= limit:
+        return names
+    n_state = len(t["states"][0])
+    return names[: min(4, n_state)] + names[n_state:]
+
+
+def trajectory_figure(t: dict[str, Any], signals: list[str] | None = None) -> go.Figure:
+    """One stacked, x-shared panel per selected signal (default: all)."""
+    chosen = [s for s in _signals(t) if signals is None or s[0] in signals]
+    rows = max(len(chosen), 1)
+    fig = make_subplots(
+        rows=rows, cols=1, shared_xaxes=True, subplot_titles=[c[0] for c in chosen] or [""]
+    )
     time = t["time"]
-    for i in range(n_state):
-        fig.add_scatter(x=time, y=[s[i] for s in t["states"]], row=i + 1, col=1)
-    for j in range(n_action):  # actions/rewards have T samples: step k acts at time[k]
-        fig.add_scatter(
-            x=time[:-1], y=[a[j] for a in t["actions"]], line_shape="hv", row=n_state + j + 1, col=1
-        )
-    fig.add_scatter(x=time[:-1], y=t["rewards"], row=len(titles), col=1)
-    fig.update_xaxes(title_text="time [s]", row=len(titles), col=1)
-    fig.update_layout(showlegend=False, height=170 * len(titles) + 60, margin={"t": 40, "b": 30})
+    for row, (_, values, step_input) in enumerate(chosen, start=1):
+        x = time[: len(values)]
+        fig.add_scatter(x=x, y=values, line_shape="hv" if step_input else "linear", row=row, col=1)
+    fig.update_xaxes(title_text="time [s]", row=rows, col=1)
+    fig.update_layout(showlegend=False, height=170 * rows + 60, margin={"t": 40, "b": 30})
     return fig
 
 
