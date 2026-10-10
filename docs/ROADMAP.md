@@ -61,7 +61,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☐ Tag `phase-1-complete`
 
 ## Phase 2 — Benchmarking
-- ☐ LQR controller (+ linearization on environments) + tests
+- ☑ LQR controller (+ linearization on environments) + tests
 - ☐ SAC wrapper + tests
 - ☐ Metrics: settling time, rise time, overshoot, steady-state error (one commit each, with tests)
 - ☐ Metrics: energy usage, control effort
