@@ -32,6 +32,6 @@ def test_compatible_controllers(client):
 
 def test_metrics_catalogue(client):
     m = {x["name"]: x for x in client.get("/metrics").json()}
-    assert set(m) == {"return", "angle_error"}
+    assert {"return", "angle_error", "settling_time", "control_effort"} <= set(m)
     assert m["angle_error"]["companions"] == [{"name": "max_abs_angle_error", "unit": None}]
     assert m["return"]["higher_is_better"] is True

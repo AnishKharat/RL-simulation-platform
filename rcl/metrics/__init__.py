@@ -1,5 +1,7 @@
 """Pure metric functions over trajectories. Definitions: rcl/metrics/DEFINITIONS.md."""
 
+from rcl.metrics.dynamics import overshoot, rise_time, settling_time, steady_state_error
+from rcl.metrics.effort import control_effort, energy_usage
 from rcl.metrics.metrics import (
     METRIC_INFO,
     METRICS,
@@ -12,6 +14,58 @@ from rcl.metrics.metrics import (
     wrap_angle,
 )
 
+# Phase 2 metrics join the manager's fixed list (selected by the manager, never by users).
+METRICS.update(
+    settling_time=settling_time,
+    rise_time=rise_time,
+    overshoot=overshoot,
+    steady_state_error=steady_state_error,
+    energy_usage=energy_usage,
+    control_effort=control_effort,
+)
+METRIC_INFO.extend(
+    [
+        MetricInfo(
+            name="settling_time",
+            description="Time until the error stays within 2% of the step size (censored: T_max).",
+            unit="s",
+            higher_is_better=False,
+            companions=[{"name": "settled", "unit": "bool"}],
+        ),
+        MetricInfo(
+            name="rise_time",
+            description="Time from 10% to 90% of the commanded step.",
+            unit="s",
+            higher_is_better=False,
+        ),
+        MetricInfo(
+            name="overshoot",
+            description="Percent of the step size beyond the setpoint.",
+            unit="%",
+            higher_is_better=False,
+        ),
+        MetricInfo(
+            name="steady_state_error",
+            description="Mean error over the final 10% of the episode.",
+            unit=None,
+            higher_is_better=False,
+        ),
+        MetricInfo(
+            name="energy_usage",
+            description="Actuation energy proxy: sum of squared action norm times dt.",
+            unit="action^2*s",
+            higher_is_better=False,
+        ),
+        MetricInfo(
+            name="control_effort",
+            description="Time-integrated action magnitude.",
+            unit="action*s",
+            higher_is_better=False,
+            companions=[{"name": "control_effort_rate", "unit": "action"}],
+        ),
+    ]
+)
+
 __all__ = [
     "METRIC_INFO",
     "METRICS",
@@ -21,5 +75,11 @@ __all__ = [
     "angle_error",
     "compute_metrics",
     "episode_return",
+    "control_effort",
+    "energy_usage",
+    "overshoot",
+    "rise_time",
+    "settling_time",
+    "steady_state_error",
     "wrap_angle",
 ]
