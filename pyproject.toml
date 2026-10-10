@@ -138,6 +138,28 @@ layers = [
     "rcl.analytics",
     "rcl.persistence | rcl.metrics",
     "rcl.environments | rcl.controllers | rcl.perturbations | rcl.ros_adapter",
+    "rcl.physics",
     "rcl.registry",
     "rcl.core",
 ]
+
+[[tool.importlinter.contracts]]
+name = "physics imports only core (ADR 0019)"
+type = "forbidden"
+source_modules = ["rcl.physics"]
+forbidden_modules = [
+    "rcl.registry", "rcl.environments", "rcl.controllers", "rcl.perturbations", "rcl.ros_adapter",
+    "rcl.experiments", "rcl.metrics", "rcl.analytics", "rcl.persistence", "rcl.api",
+    "rcl.benchmark", "rcl.frontend",
+]
+
+[[tool.importlinter.contracts]]
+name = "only environments import physics (ADR 0019)"
+type = "forbidden"
+source_modules = [
+    "rcl.core", "rcl.registry", "rcl.controllers", "rcl.perturbations", "rcl.ros_adapter",
+    "rcl.experiments", "rcl.metrics", "rcl.analytics", "rcl.persistence", "rcl.api",
+    "rcl.benchmark", "rcl.frontend",
+]
+forbidden_modules = ["rcl.physics"]
+allow_indirect_imports = true  # e.g. experiments -> registry discovery -> environments -> physics at run time

@@ -43,7 +43,7 @@ The project should demonstrate: software architecture, AI engineering, reinforce
 |---|-----------|-------------|
 | 1 | **Environment and controller are independent** | Controllers only see the `BaseEnvironment` interface, never a concrete robot. |
 | 2 | **Frontend has zero environment-specific logic** | Dropdowns, parameter forms and plots are generated from registry metadata. |
-| 3 | **New robot = 1 file + 1 registry entry** | No edits to the experiment manager, API, metrics or frontend. |
+| 3 | **New robot = 1 file + 1 registry entry** | No edits to the experiment manager, API, metrics or frontend. Model assets (URDF, meshes) may ship in a sibling folder `environments/assets/<robot_id>/`. |
 | 4 | **Benchmarking is first-class** | Every run produces standardized, comparable, reproducible metrics. |
 | 5 | **Reproducibility by default** | Every run stores seed, config, code version, and library versions. |
 | 6 | **Layers depend downward only** | Frontend → API → Experiment Manager → Controllers/Environments → Physics. No upward imports. |
@@ -58,6 +58,7 @@ Each module has one responsibility, a defined public interface, and its own test
 rcl/
 ├── core/            # Interfaces & types ONLY (no heavy deps). BaseEnvironment, BaseController, specs, configs
 ├── registry/        # Environment + controller registries, discovery, metadata
+├── physics/         # (Phase 3) PhysicsBackend implementations (PyBullet; later MuJoCo). Used by environments only
 ├── environments/    # One file per robot. Each self-registers.
 │   ├── cartpole.py
 │   ├── pendulum.py
@@ -78,7 +79,8 @@ tests/               # at the repository root (mirrors rcl/), not inside the pac
 
 **Dependency rules**
 - `core` imports nothing from the project.
-- `environments` and `controllers` import only `core` and `registry` (the registration decorator) (+ third-party).
+- `environments` import only `core`, `registry` (the registration decorator) and `physics` (+ third-party); `controllers` import only `core` and `registry` (+ third-party).
+- `physics` (PhysicsBackend implementations, e.g. PyBullet; ADR 0019) imports only `core`. Only environments may import it.
 - `registry` imports only `core`; it loads environments/controllers by name (discovery), never statically.
 - `experiments` imports `core`, `registry`, `metrics`, `persistence`.
 - `api` imports `experiments`, `analytics`, `registry`, `persistence`.
