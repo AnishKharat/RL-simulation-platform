@@ -67,6 +67,8 @@ def test_page_runs_a_benchmark_and_shows_comparison_from_registry_data(api):
     assert any("Skipped" in c.value for c in at.caption)  # discrete env x PID/LQR
     assert at.selectbox(key="bench-env").options == ["cartpole"]
     assert "return" in at.selectbox(key="bench-metric").options
+    assert at.selectbox(key="bench-metric").options[:2] == ["success_rate", "time_to_success"]
+    assert any("not the headline metric" in c.value for c in at.caption)
     assert len(at.dataframe) >= 2
     at.selectbox(key="bench-metric").select("settling_time").run()
     assert not at.exception and any("Fewer than 5 seeds" in i.value for i in at.info)
