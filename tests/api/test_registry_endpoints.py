@@ -7,7 +7,8 @@ def test_lists_are_sorted_and_carry_forms_and_labels(client):
     envs = ids(client.get("/environments"))
     assert envs == sorted(envs)  # optional-extra robots (e.g. PyBullet) may add entries
     assert {"cartpole", "cartpole_discrete", "inverted_pendulum"} <= set(envs)
-    assert ids(client.get("/controllers")) == ["lqr", "pid", "ppo", "sac"]
+    ctls = ids(client.get("/controllers"))
+    assert ctls == sorted(ctls) and {"lqr", "pid", "ppo", "sac", "td3"} <= set(ctls)
     env = next(e for e in client.get("/environments").json() if e["id"] == "cartpole")
     assert env["kind"] == "environment" and env["metadata"]["state_labels"]
     assert env["params_schema"]["properties"]["force_mag"]["default"] == 10.0
@@ -16,15 +17,10 @@ def test_lists_are_sorted_and_carry_forms_and_labels(client):
 
 
 def test_compatible_controllers(client):
-    assert ids(client.get("/controllers/compatible", params={"env_id": "cartpole"})) == [
-        "lqr",
-        "pid",
-        "ppo",
-        "sac",
-    ]
-    assert ids(client.get("/controllers/compatible", params={"env_id": "cartpole_discrete"})) == [
-        "ppo"
-    ]
+    cont = ids(client.get("/controllers/compatible", params={"env_id": "cartpole"}))
+    assert {"lqr", "pid", "ppo", "sac", "td3"} <= set(cont)
+    disc = ids(client.get("/controllers/compatible", params={"env_id": "cartpole_discrete"}))
+    assert disc == ["ppo"]  # the only discrete-action controller
     assert client.get("/controllers/compatible", params={"env_id": "nope"}).status_code == 404
     assert client.get("/controllers/compatible").status_code == 422
 

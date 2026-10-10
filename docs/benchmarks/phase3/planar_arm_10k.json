@@ -1,0 +1,8 @@
+{
+  "name": "phase3-planar-arm",
+  "environments": [{"id": "planar_arm"}],
+  "controllers": [{"id": "ppo"}, {"id": "sac"}],
+  "seeds": [0, 1, 2, 3, 4],
+  "episodes": 5,
+  "training": {"total_timesteps": 10000}
+}

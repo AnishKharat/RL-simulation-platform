@@ -109,6 +109,13 @@ def _spec_lines(spec: dict[str, Any]) -> list[str]:
     return lines
 
 
+CAVEAT = (
+    "Headline metrics ({names}) say whether the task was achieved. The reward sum (`return`) is a "
+    "training signal, not the headline metric: success ends an episode early, so a controller that "
+    "succeeds can score a lower return than one that never does."
+)
+
+
 def build_report(
     title: str,
     spec: dict[str, Any],
@@ -128,7 +135,13 @@ def build_report(
         md += [f"## Environment: {env}", ""]
         body.append(f"<h2>Environment: {html.escape(env)}</h2>")
         table = by_metric(summary, env)
-        for info in (i for i in infos if i.name in table):
+        ordered = sorted((i for i in infos if i.name in table), key=lambda i: not i.headline)
+        heads = [i.name for i in ordered if i.headline]
+        if heads:
+            intro = CAVEAT.format(names=", ".join(heads))
+            md += [f"> {intro}", ""]
+            body.append(f"<p><em>{html.escape(intro)}</em></p>")
+        for info in ordered:
             rows = sorted(table[info.name].values(), key=lambda r: r.controller_id)
             unit = rows[0].unit
             direction = "higher is better" if info.higher_is_better else "lower is better"

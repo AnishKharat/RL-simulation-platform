@@ -84,8 +84,17 @@ def show(suite: dict[str, Any]) -> None:
     env = st.selectbox("Environment", env_ids, key="bench-env")
     rows = client.benchmark_summary(suite["suite_id"], env)
     present = {r["metric_name"] for r in rows}
-    catalogue = [m for m in client.metrics() if m["name"] in present]
+    catalogue = sorted(
+        (m for m in client.metrics() if m["name"] in present),
+        key=lambda m: not m.get("headline", False),  # outcome metrics first
+    )
     metric = st.selectbox("Metric", [m["name"] for m in catalogue], key="bench-metric")
+    heads = [m["name"] for m in catalogue if m.get("headline")]
+    if heads:
+        st.caption(
+            f"Headline metrics: {', '.join(heads)}. The reward sum (return) is a training signal, "
+            "not the headline metric: success ends episodes early."
+        )
     info = next((m for m in catalogue if m["name"] == metric), None)
     if info is not None:
         st.caption(info["description"] + ("" if info["higher_is_better"] else " Lower is better."))

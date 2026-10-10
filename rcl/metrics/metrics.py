@@ -38,6 +38,7 @@ class MetricInfo(BaseModel):
     unit: str | None
     higher_is_better: bool
     ci_method: Literal["t", "bootstrap"] = "t"  # interval across seeds (DEFINITIONS.md)
+    headline: bool = False  # reported first: did the controller achieve the task?
     companions: list[dict[str, str | None]] = Field(default_factory=list)
 
 

@@ -75,3 +75,18 @@ def test_skipped_pairs_section_in_markdown_and_html():
     assert "## Skipped pairs" in r.markdown and "- c1 on disc: not <compatible>" in r.markdown
     assert "<li>c1 on disc: not &lt;compatible&gt;</li>" in r.html
     assert "Skipped pairs" not in build_report("t", SPEC, SUMMARY, METRIC_INFO).markdown
+
+
+def test_headline_metrics_lead_the_report_and_return_is_caveated():
+    summary = [
+        row("c1", 12.0, 10.0, 14.0),
+        row("c1", 0.25, 0.0, 0.5, metric="success_rate", unit="fraction", ci_method="bootstrap"),
+        row("c2", 3.0, 2.0, 4.0, metric="time_to_success", unit="s", ci_method="bootstrap"),
+    ]
+    r = build_report("t", SPEC, summary, METRIC_INFO)
+    md = r.markdown
+    assert md.index("### success_rate") < md.index("### time_to_success") < md.index("### return")
+    assert "> Headline metrics (success_rate, time_to_success)" in md
+    assert "not the headline metric" in md and "not the headline metric" in r.html
+    no_headline = build_report("t", SPEC, [row("c1", 12.0, 10.0, 14.0)], METRIC_INFO)
+    assert "Headline metrics" not in no_headline.markdown
