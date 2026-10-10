@@ -20,15 +20,21 @@ from pydantic import BaseModel, ValidationError
 
 from rcl.core.controller import BaseController
 from rcl.core.environment import BaseEnvironment
-from rcl.core.types import ControllerMetadata, EnvMetadata
+from rcl.core.perturbation import ParamPerturbation, StepPerturbation
+from rcl.core.types import ControllerMetadata, EnvMetadata, PerturbationMetadata
 
-Kind = Literal["environment", "controller"]
+Kind = Literal["environment", "controller", "perturbation"]
 # Class attribute holding the static metadata, and its required type, per kind.
 _META: dict[str, tuple[str, type[BaseModel]]] = {
     "environment": ("env_metadata", EnvMetadata),
     "controller": ("metadata", ControllerMetadata),
+    "perturbation": ("perturbation_metadata", PerturbationMetadata),
 }
-_BASE: dict[str, type] = {"environment": BaseEnvironment, "controller": BaseController}
+_BASE: dict[str, type | tuple[type, ...]] = {
+    "environment": BaseEnvironment,
+    "controller": BaseController,
+    "perturbation": (StepPerturbation, ParamPerturbation),
+}
 _ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
@@ -117,10 +123,14 @@ def _non_finite(value: Any, loc: list[str | int]) -> list[list[str | int]]:
 
 
 class Registry:
-    """Two id namespaces (environments, controllers) with compatibility queries."""
+    """Three id namespaces (environments, controllers, perturbations) with compatibility queries."""
 
     def __init__(self) -> None:
-        self._entries: dict[Kind, dict[str, Entry]] = {"environment": {}, "controller": {}}
+        self._entries: dict[Kind, dict[str, Entry]] = {
+            "environment": {},
+            "controller": {},
+            "perturbation": {},
+        }
 
     def register(
         self, kind: Kind, id: str, cls: type, params: type[BaseModel] | None = None
@@ -129,8 +139,10 @@ class Registry:
         if not _ID_RE.match(id):
             raise RegistryError(f"invalid {kind} id {id!r}: must match {_ID_RE.pattern}")
         if not (isinstance(cls, type) and issubclass(cls, _BASE[kind])):
+            base = _BASE[kind]
+            names = " or ".join(b.__name__ for b in (base if isinstance(base, tuple) else (base,)))
             raise RegistryError(
-                f"{getattr(cls, '__qualname__', cls)!r} must subclass {_BASE[kind].__name__} "
+                f"{getattr(cls, '__qualname__', cls)!r} must subclass {names} "
                 f"to be registered as an {kind}"
             )
         attr, meta_type = _META[kind]
@@ -277,6 +289,13 @@ def register_controller(
 ) -> Callable[[type], type]:
     """Class decorator: register a controller under ``id``. Returns the class unchanged."""
     return _decorator("controller", id, params)
+
+
+def register_perturbation(
+    id: str, *, params: type[BaseModel] | None = None
+) -> Callable[[type], type]:
+    """Class decorator: register a perturbation under ``id``. Returns the class unchanged."""
+    return _decorator("perturbation", id, params)
 
 
 # Single list of plugin packages scanned for decorators; keep in sync with the import-linter

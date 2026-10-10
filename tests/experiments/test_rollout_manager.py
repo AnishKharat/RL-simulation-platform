@@ -91,7 +91,7 @@ def test_execute_rejects_bad_configs_before_work():
     bad = types(controller={"id": "pid", "params": {"kq": 1}})
     assert bad == {(("controller", "params", "kq"), "extra_forbidden")}
     assert types(ctl="ppo") == {(("training",), "missing")}
-    assert types(perturbations=[{"id": "noise"}]) == {(("perturbations",), "unsupported")}
+    assert types(perturbations=[{"id": "noise"}]) == {(("perturbations", 0, "id"), "unknown_id")}
     assert len(types(env="nope", ctl="nope")) == 2  # all problems reported at once
 
 

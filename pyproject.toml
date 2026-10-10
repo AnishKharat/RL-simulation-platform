@@ -75,6 +75,16 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "perturbations import only core and registry"
+type = "forbidden"
+source_modules = ["rcl.perturbations"]
+forbidden_modules = [
+    "rcl.environments", "rcl.controllers", "rcl.ros_adapter", "rcl.physics",
+    "rcl.experiments", "rcl.metrics", "rcl.analytics", "rcl.persistence", "rcl.api",
+    "rcl.benchmark", "rcl.frontend",
+]
+
+[[tool.importlinter.contracts]]
 name = "registry imports only core"
 type = "forbidden"
 source_modules = ["rcl.registry"]
