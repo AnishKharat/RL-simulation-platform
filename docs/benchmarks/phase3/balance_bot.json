@@ -1,0 +1,13 @@
+{
+  "name": "phase3-balance-bot",
+  "environments": [{"id": "balance_bot"}],
+  "controllers": [
+    {"id": "pid", "params": {"obs_index": 0, "kp": 3.0, "kd": 0.3}},
+    {"id": "lqr"},
+    {"id": "ppo"},
+    {"id": "sac"}
+  ],
+  "seeds": [0, 1, 2, 3, 4],
+  "episodes": 5,
+  "training": {"total_timesteps": 10000}
+}

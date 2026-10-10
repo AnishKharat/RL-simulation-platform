@@ -39,6 +39,19 @@ spec.json` for per-controller parameters. The dashboard's **Benchmark** page doe
 interactively. Optional: `--mlflow-uri` (or `RCL_MLFLOW_URI` for the API) logs training curves and
 checkpoints to MLflow.
 
+## PyBullet robots (optional)
+
+`balance_bot` (self-balancing robot) and `planar_arm` (2-DOF reaching arm) need the optional `physics` extra:
+
+```bash
+python -m venv .venv && .venv/Scripts/activate      # or source .venv/bin/activate
+pip install -e ".[dev,physics]"
+```
+
+PyBullet 3.2.7 publishes a wheel only for Linux CPython 3.11. On other platforms or Python 3.12 pip builds it from
+source, which needs a C++ compiler (on Windows, the Visual Studio Build Tools). Without the extra these robots simply
+do not appear in the registry, and everything else works. Results and specs are in `docs/benchmarks/phase3/`.
+
 ## Add a robot or controller (one file)
 
 Drop a module into `rcl/environments/` (or `rcl/controllers/`) with a registry decorator:
