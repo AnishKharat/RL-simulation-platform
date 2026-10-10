@@ -8,7 +8,8 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Any
 
 from rcl.core.config import ExperimentConfig
-from rcl.experiments.manager import RunResult, execute
+from rcl.experiments.benchmark import BenchmarkSpec, plan
+from rcl.experiments.manager import RunResult, derive_seeds, execute, resolve_config
 from rcl.metrics import MetricValue
 from rcl.persistence import Repository
 from rcl.registry import Registry
@@ -63,52 +64,97 @@ def to_rows(result: RunResult) -> dict[str, Any]:
     }
 
 
+def run_and_store(
+    repo: Repository, registry: Registry, run_id: str, config: ExperimentConfig, seed: int
+) -> bool:
+    """Execute one queued run and persist its results; returns False if it failed.
+
+    Never raises: any exception becomes a ``failed`` run (a worker must never die silently).
+    """
+    stage, trained = "starting", False
+
+    def tick(**fields: Any) -> None:
+        try:  # a lost progress update must never fail the run
+            repo.update_run(run_id, **fields)
+        except Exception:
+            log.warning("progress update for %s failed", run_id, exc_info=True)
+
+    def on_stage(name: str) -> None:
+        nonlocal stage, trained
+        stage, trained = name, trained or name == "training"
+        tick(stage=name, progress=_TRAIN_SHARE if name == "evaluating" and trained else 0.0)
+
+    def progress(done: int, total: int) -> None:
+        tick(progress=_TRAIN_SHARE * min(done / total, 1.0))
+
+    try:
+        repo.update_run(run_id, status="running")
+        result = execute(
+            config,
+            seed=seed,
+            registry=registry,
+            checkpoint_dir=repo.checkpoint_dir(run_id),
+            on_stage=on_stage,
+            progress=progress,
+        )
+        stage = "saving"
+        repo.update_run(run_id, stage=stage, progress=0.95)
+        repo.save_results(run_id, **to_rows(result))
+        return True
+    except Exception as exc:  # job boundary
+        log.exception("run %s failed in stage %s", run_id, stage)
+        repo.fail_run(run_id, type(exc).__name__, str(exc), stage)
+        return False
+
+
+def run_stored_benchmark(
+    repo: Repository, registry: Registry, bench_id: str, suite_id: str, spec: BenchmarkSpec
+) -> None:
+    """Run a benchmark whose suite row exists: create every experiment/run (queued) up front,
+    then execute them sequentially. A failed run does not stop the others; the benchmark run
+    ends ``failed`` if any run failed, ``done`` otherwise."""
+    try:
+        repo.update_benchmark_run(bench_id, status="running")
+        pairs, _ = plan(spec, registry)
+        queued: list[tuple[str, ExperimentConfig, int]] = []
+        for env, ctl in pairs:
+            first = spec.experiment(env, ctl, spec.seeds[0])
+            resolved, _, _ = resolve_config(first, registry)
+            exp_id, run_id = repo.create_experiment(
+                resolved, spec.seeds[0], derive_seeds(spec.seeds[0]), suite_id=suite_id
+            )
+            queued.append((run_id, resolved, spec.seeds[0]))
+            for seed in spec.seeds[1:]:
+                queued.append((repo.add_run(exp_id, seed, derive_seeds(seed)), resolved, seed))
+        failed = 0
+        for done, (run_id, config, seed) in enumerate(queued, start=1):
+            failed += not run_and_store(repo, registry, run_id, config, seed)
+            repo.update_benchmark_run(bench_id, progress=done / len(queued))
+        if failed:
+            error = {"type": "RunsFailed", "message": f"{failed} of {len(queued)} runs failed"}
+            repo.update_benchmark_run(bench_id, status="failed", error=error)
+        else:
+            repo.update_benchmark_run(bench_id, status="done", progress=1.0)
+    except Exception as exc:  # job boundary
+        log.exception("benchmark %s failed", bench_id)
+        error = {"type": type(exc).__name__, "message": str(exc)}
+        repo.update_benchmark_run(bench_id, status="failed", error=error)
+
+
 class JobManager:
-    """Runs experiments on a bounded thread pool; any exception becomes a ``failed`` run."""
+    """Runs experiments and benchmarks on a bounded thread pool; failures are recorded."""
 
     def __init__(self, repo: Repository, registry: Registry, max_workers: int = 2) -> None:
         self._repo, self._registry = repo, registry
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="rcl-job")
 
-    def submit(self, run_id: str, config: ExperimentConfig, seed: int) -> Future[None]:
-        return self._pool.submit(self._run, run_id, config, seed)
+    def submit(self, run_id: str, config: ExperimentConfig, seed: int) -> Future[bool]:
+        return self._pool.submit(run_and_store, self._repo, self._registry, run_id, config, seed)
+
+    def submit_benchmark(self, bench_id: str, suite_id: str, spec: BenchmarkSpec) -> Future[None]:
+        return self._pool.submit(
+            run_stored_benchmark, self._repo, self._registry, bench_id, suite_id, spec
+        )
 
     def shutdown(self) -> None:
         self._pool.shutdown(wait=True, cancel_futures=True)
-
-    def _run(self, run_id: str, config: ExperimentConfig, seed: int) -> None:
-        repo, stage, trained = self._repo, "starting", False
-
-        def tick(**fields: Any) -> None:
-            try:  # a lost progress update must never fail the run
-                repo.update_run(run_id, **fields)
-            except Exception:
-                log.warning("progress update for %s failed", run_id, exc_info=True)
-
-        def on_stage(name: str) -> None:
-            nonlocal stage, trained
-            stage, trained = name, trained or name == "training"
-            tick(
-                stage=name,
-                progress=_TRAIN_SHARE if name == "evaluating" and trained else 0.0,
-            )
-
-        def progress(done: int, total: int) -> None:
-            tick(progress=_TRAIN_SHARE * min(done / total, 1.0))
-
-        try:
-            repo.update_run(run_id, status="running")
-            result = execute(
-                config,
-                seed=seed,
-                registry=self._registry,
-                checkpoint_dir=repo.checkpoint_dir(run_id),
-                on_stage=on_stage,
-                progress=progress,
-            )
-            stage = "saving"
-            repo.update_run(run_id, stage=stage, progress=0.95)
-            repo.save_results(run_id, **to_rows(result))
-        except Exception as exc:  # job boundary: a worker must never die silently
-            log.exception("run %s failed in stage %s", run_id, stage)
-            repo.fail_run(run_id, type(exc).__name__, str(exc), stage)
