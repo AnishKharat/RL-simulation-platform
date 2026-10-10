@@ -22,3 +22,18 @@ jobs:
       - run: mypy rcl
       - run: lint-imports
       - run: pytest -q
+
+  physics:
+    # ADR 0020: PyBullet ships a prebuilt wheel only for Linux CPython 3.11, so the simulator
+    # tests run here; the matrix above runs without the optional extra (those tests skip).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e ".[dev,physics]" --extra-index-url https://download.pytorch.org/whl/cpu
+      - run: python -c "import pybullet"
+      - run: lint-imports
+      - run: pytest -q
