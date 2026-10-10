@@ -30,8 +30,12 @@ class PhysicsBackend(Protocol):
       library version and headless mode (see ``spikes/pybullet_determinism``).
     * State: ``get_state`` returns the full generalised state as a float64 copy (joint positions,
       joint velocities and, for floating-base robots, base pose and twist) in a fixed order the
-      environment documents; ``set_state`` restores exactly such a vector. Together they also
-      give finite-difference linearisation (``BaseEnvironment.get_linearization``).
+      environment documents. ``set_state`` writes such a vector AND clears the simulator's
+      internal caches (contacts, solver warm start): deterministic as a procedure, but NOT an
+      exact continuation of the run the vector was read from (spike: diverges with contacts).
+      Exact continuation needs ``save`` / ``restore`` (native snapshots, internal caches
+      included). Finite-difference linearisation evaluates every perturbation the same way:
+      ``restore(base)``, ``set_state(x +/- eps)``, then step.
     * Actuation: ``apply_joint_torques`` sets the torque of every actuated joint (length =
       actuated joint count) and holds it until the next call. Environments map their action
       space onto it (clipping and scaling are the environment's job, reported in
@@ -60,7 +64,15 @@ class PhysicsBackend(Protocol):
         ...
 
     def set_state(self, state: np.ndarray) -> None:
-        """Restore a state previously returned by ``get_state`` (or built in that layout)."""
+        """Write a ``get_state``-layout vector; clears internal caches (not an exact restore)."""
+        ...
+
+    def save(self) -> int:
+        """Exact in-memory snapshot of the whole simulation; returns a handle for ``restore``."""
+        ...
+
+    def restore(self, handle: int) -> None:
+        """Return exactly to a ``save`` snapshot (same continuation, bit for bit)."""
         ...
 
     def apply_joint_torques(self, torques: np.ndarray) -> None:

@@ -26,6 +26,11 @@ class _Fake:
     def set_state(self, state: np.ndarray) -> None:
         self._s = np.array(state, dtype=np.float64)
 
+    def save(self) -> int:
+        return 0
+
+    def restore(self, handle: int) -> None: ...
+
     def apply_joint_torques(self, torques: np.ndarray) -> None: ...
 
     def render(self, width: int, height: int) -> np.ndarray | None:
