@@ -71,7 +71,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☑ Analytics: statistical summaries / confidence intervals
 - ☑ MLflow integration
 - ☑ Comparison dashboard page
-- ☐ Report export (Markdown/HTML)
+- ☑ Report export (Markdown/HTML)
 - ☐ Tag `phase-2-complete`
 
 ## Phase 3 — Advanced Robotics
