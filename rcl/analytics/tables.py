@@ -103,9 +103,9 @@ def paired_difference(
     metric's own. The result's ``controller_id`` is ``"a-b"``.
     """
 
-    def per_seed(ctl: str) -> dict[int, float]:
+    def per_seed(ctl: str) -> dict[int, tuple[float, str]]:
         return {
-            r["seed"]: r["value"]
+            r["seed"]: (r["value"], r["status"])
             for r in rows
             if (r["env_id"], r["controller_id"], r["metric_name"]) == (env_id, ctl, metric)
             and r["value"] is not None
@@ -121,9 +121,9 @@ def paired_difference(
             "metric_name": metric,
             "seed": s,
             "run_id": "",
-            "value": first[s] - second[s],
+            "value": first[s][0] - second[s][0],
             "unit": unit,
-            "status": "ok",
+            "status": "censored" if "censored" in (first[s][1], second[s][1]) else "ok",
         }
         for s in sorted(first.keys() & second.keys())
     ]

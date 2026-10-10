@@ -103,3 +103,19 @@ def test_aggregate_means_and_excludes_undefined():
     assert agg["angle_error"].companions["max_abs_angle_error"][0] == pytest.approx(0.2)
     allbad = aggregate([compute_metrics(traj([0.1, np.nan]), TASK)])
     assert all(m.status == "undefined" for m in allbad)
+
+
+def test_undefined_companions_keep_their_own_units_and_aggregate_survives_undefined_first():
+    from rcl.metrics import aggregate
+    from rcl.metrics.dynamics import settling_time
+    from rcl.metrics.effort import control_effort
+
+    bad = traj([0.5, np.nan, 0.0])
+    assert settling_time(bad, TASK).companions["settled"][1] == "bool"
+    assert control_effort(bad, TASK).companions["control_effort_rate"][1] == "action"
+    good = traj([0.5, 0.1, 0.0])
+    agg = {m.name: m for m in aggregate([[settling_time(bad, TASK)], [settling_time(good, TASK)]])}
+    assert (
+        agg["settling_time"].status == "ok"
+        and agg["settling_time"].companions["settled"][1] == "bool"
+    )

@@ -413,7 +413,12 @@ class Repository:
                 RunRow.status == "done",
                 MetricResultRow.episode_id.is_(None),
             )
-            .order_by(ExperimentRow.env_id, ExperimentRow.controller_id, RunRow.seed)
+            .order_by(
+                ExperimentRow.env_id,
+                ExperimentRow.controller_id,
+                RunRow.seed,
+                MetricResultRow.metric_name,  # pins report / CSV row order
+            )
         )
         keys = (
             "env_id",

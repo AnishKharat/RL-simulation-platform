@@ -47,7 +47,7 @@ def settling_time(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
     """
     unit = "s"
     if not _check(traj):
-        return _undefined("settling_time", unit, ("settled",))
+        return _undefined("settling_time", unit, {"settled": "bool"})
     e, s, _, _ = _geometry(traj, task)
     band = 0.02 * max(s, task.step_floor)
     outside = np.flatnonzero(e > band)

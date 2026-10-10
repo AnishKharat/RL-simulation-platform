@@ -27,7 +27,7 @@ def control_effort(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
     (smoothness; 0 when T < 2)."""
     unit = "action*s"
     if not _check(traj):
-        return _undefined("control_effort", unit, ("control_effort_rate",))
+        return _undefined("control_effort", unit, {"control_effort_rate": "action"})
     u = _actions(traj)
     rate = float(np.linalg.norm(np.diff(u, axis=0), axis=1).sum())
     return MetricValue(
