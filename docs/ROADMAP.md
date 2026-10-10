@@ -39,8 +39,8 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☑ Tag `phase-0-complete`
 
 ## Phase 1 — MVP
-- ☐ Registry implementation + tests
-- ☐ Auto-discovery of environments/controllers + tests
+- ☑ Registry implementation + tests
+- ☑ Auto-discovery of environments/controllers + tests
 - ☐ CartPole (continuous) + tests
 - ☐ CartPole (discrete variant) + tests
 - ☐ Inverted Pendulum (balance) + tests
