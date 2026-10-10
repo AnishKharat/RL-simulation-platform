@@ -22,6 +22,7 @@ from rcl.experiments import (
     ConfigError,
     JobManager,
     MetricInfo,
+    MlflowTracker,
     derive_seeds,
     resolve_config,
 )
@@ -60,7 +61,8 @@ def create_app(
             artifact_root or os.environ.get("RCL_ARTIFACTS", "artifacts"),
         )
         repo.fail_orphans()  # runs left over from a previous process can never finish
-        jobs = JobManager(repo, reg, max_workers)
+        uri = os.environ.get("RCL_MLFLOW_URI")  # optional: log training curves/checkpoints
+        jobs = JobManager(repo, reg, max_workers, MlflowTracker(uri) if uri else None)
         app.state.registry, app.state.repo, app.state.jobs = reg, repo, jobs
         yield
         jobs.shutdown()

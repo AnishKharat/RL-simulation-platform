@@ -10,6 +10,7 @@ from typing import Any
 from rcl.core.config import ExperimentConfig
 from rcl.experiments.benchmark import BenchmarkSpec, plan
 from rcl.experiments.manager import RunResult, derive_seeds, execute, resolve_config
+from rcl.experiments.tracking import Tracker
 from rcl.metrics import MetricValue
 from rcl.persistence import Repository
 from rcl.registry import Registry
@@ -64,8 +65,46 @@ def to_rows(result: RunResult) -> dict[str, Any]:
     }
 
 
+def _record_training(
+    repo: Repository, tracker: Tracker | None, run_id: str, result: RunResult
+) -> None:
+    """Link the checkpoint in the DB and, if a tracker is configured, log curve + checkpoint."""
+    ckpt = repo.checkpoint_dir(run_id)
+    if not ckpt.is_dir() or result.train is None:
+        return
+    mlflow_id = None
+    if tracker is not None:
+        rec = result.record
+        try:
+            mlflow_id = tracker.log_training(
+                run_name=f"{rec.config.name}:seed{rec.seed}",
+                params={
+                    "run_id": run_id,
+                    "environment": rec.config.environment.id,
+                    "controller": rec.config.controller.id,
+                    "config_hash": rec.config_hash,
+                    "seed": str(rec.seed),
+                    "train_seed": str(rec.derived_seeds["train"]),
+                    "code_version": rec.code_version,
+                },
+                curve=list(result.train.curve),
+                checkpoint_dir=ckpt,
+            )
+        except Exception:
+            log.warning("tracking run %s failed", run_id, exc_info=True)
+    try:
+        repo.link_checkpoint(run_id, ckpt, mlflow_id)
+    except Exception:
+        log.warning("linking checkpoint of %s failed", run_id, exc_info=True)
+
+
 def run_and_store(
-    repo: Repository, registry: Registry, run_id: str, config: ExperimentConfig, seed: int
+    repo: Repository,
+    registry: Registry,
+    run_id: str,
+    config: ExperimentConfig,
+    seed: int,
+    tracker: Tracker | None = None,
 ) -> bool:
     """Execute one queued run and persist its results; returns False if it failed.
 
@@ -100,6 +139,8 @@ def run_and_store(
         stage = "saving"
         repo.update_run(run_id, stage=stage, progress=0.95)
         repo.save_results(run_id, **to_rows(result))
+        if result.train is not None:  # DB is already complete: tracking problems never fail a run
+            _record_training(repo, tracker, run_id, result)
         return True
     except Exception as exc:  # job boundary
         log.exception("run %s failed in stage %s", run_id, stage)
@@ -108,7 +149,12 @@ def run_and_store(
 
 
 def run_stored_benchmark(
-    repo: Repository, registry: Registry, bench_id: str, suite_id: str, spec: BenchmarkSpec
+    repo: Repository,
+    registry: Registry,
+    bench_id: str,
+    suite_id: str,
+    spec: BenchmarkSpec,
+    tracker: Tracker | None = None,
 ) -> None:
     """Run a benchmark whose suite row exists: create every experiment/run (queued) up front,
     then execute them sequentially. A failed run does not stop the others; the benchmark run
@@ -128,7 +174,7 @@ def run_stored_benchmark(
                 queued.append((repo.add_run(exp_id, seed, derive_seeds(seed)), resolved, seed))
         failed = 0
         for done, (run_id, config, seed) in enumerate(queued, start=1):
-            failed += not run_and_store(repo, registry, run_id, config, seed)
+            failed += not run_and_store(repo, registry, run_id, config, seed, tracker)
             repo.update_benchmark_run(bench_id, progress=done / len(queued))
         if failed:
             error = {"type": "RunsFailed", "message": f"{failed} of {len(queued)} runs failed"}
@@ -144,16 +190,30 @@ def run_stored_benchmark(
 class JobManager:
     """Runs experiments and benchmarks on a bounded thread pool; failures are recorded."""
 
-    def __init__(self, repo: Repository, registry: Registry, max_workers: int = 2) -> None:
-        self._repo, self._registry = repo, registry
+    def __init__(
+        self,
+        repo: Repository,
+        registry: Registry,
+        max_workers: int = 2,
+        tracker: Tracker | None = None,
+    ) -> None:
+        self._repo, self._registry, self._tracker = repo, registry, tracker
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="rcl-job")
 
     def submit(self, run_id: str, config: ExperimentConfig, seed: int) -> Future[bool]:
-        return self._pool.submit(run_and_store, self._repo, self._registry, run_id, config, seed)
+        return self._pool.submit(
+            run_and_store, self._repo, self._registry, run_id, config, seed, self._tracker
+        )
 
     def submit_benchmark(self, bench_id: str, suite_id: str, spec: BenchmarkSpec) -> Future[None]:
         return self._pool.submit(
-            run_stored_benchmark, self._repo, self._registry, bench_id, suite_id, spec
+            run_stored_benchmark,
+            self._repo,
+            self._registry,
+            bench_id,
+            suite_id,
+            spec,
+            self._tracker,
         )
 
     def shutdown(self) -> None:

@@ -11,9 +11,12 @@ from rcl.experiments.benchmark import (
 from rcl.experiments.jobs import JobManager
 from rcl.experiments.manager import ConfigError, RunResult, derive_seeds, execute, resolve_config
 from rcl.experiments.rollout import rollout
+from rcl.experiments.tracking import MlflowTracker, Tracker
 from rcl.metrics import METRIC_INFO, MetricInfo
 
 __all__ = [
+    "MlflowTracker",
+    "Tracker",
     "BenchmarkResult",
     "BenchmarkSpec",
     "Cell",
