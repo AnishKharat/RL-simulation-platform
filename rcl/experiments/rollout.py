@@ -35,7 +35,7 @@ def rollout(
         obs, _ = env.reset(seed=seed + i)
         controller.reset()
         observations, states = [np.asarray(obs, dtype=np.float64)], [env.get_state()]
-        commanded, applied, rewards = [], [], []
+        commanded, applied, rewards, perturbed = [], [], [], []
         terminated = truncated = success = False
         hold = 0
         for _ in range(task.horizon_steps):
@@ -44,6 +44,8 @@ def rollout(
             commanded.append(np.asarray(command, dtype=np.float64))
             applied.append(np.asarray(info["applied_action"], dtype=np.float64))
             rewards.append(float(reward))
+            if info.get("perturbed"):
+                perturbed.append(len(rewards) - 1)
             observations.append(np.asarray(obs, dtype=np.float64))
             states.append(env.get_state())
             if terminated:
@@ -69,6 +71,7 @@ def rollout(
                 seed=seed + i,
                 success=success,
                 commanded_actions=np.stack(commanded),
+                perturbation_steps=tuple(perturbed),
             )
         )
     return trajectories

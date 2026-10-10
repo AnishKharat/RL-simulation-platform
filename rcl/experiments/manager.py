@@ -14,12 +14,13 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 import numpy as np
 
-from rcl.core.config import ExperimentConfig, RunRecord
+from rcl.core.config import ExperimentConfig, PerturbationConfig, RunRecord
 from rcl.core.environment import BaseEnvironment
+from rcl.core.perturbation import ParamPerturbation
 from rcl.core.types import EpisodeTrajectory, TaskSpec, TrainConfig, TrainResult
 from rcl.experiments.rollout import rollout
 from rcl.metrics import MetricValue, aggregate, compute_metrics
@@ -82,8 +83,10 @@ def resolve_config(
             resolved[kind] = comp.model_copy(update={"params": entry.validate_params(comp.params)})
         except ParamValidationError as exc:
             errors += [_err([kind, "params", *e["loc"]], e["msg"], e["type"]) for e in exc.errors]
-    if config.perturbations:
-        errors.append(_err(["perturbations"], "not supported before Phase 4", "unsupported"))
+    if "environment" in resolved:
+        resolved["perturbations"] = _resolve_perturbations(
+            config, registry, entries.get("environment"), resolved["environment"].params, errors
+        )
     if len(entries) == 2:
         env_e, ctl_e = entries["environment"], entries["controller"]
         if not registry.is_compatible(ctl_e.id, env_e.id):
@@ -113,6 +116,71 @@ def resolve_config(
     if errors:
         raise ConfigError(errors)
     return config.model_copy(update=resolved), entries["environment"], entries["controller"]
+
+
+def _resolve_perturbations(
+    config: ExperimentConfig,
+    registry: Registry,
+    env_entry: Entry | None,
+    env_params: dict[str, Any],
+    errors: list[dict[str, Any]],
+) -> list[PerturbationConfig]:
+    """Validate each perturbation: known id, valid params, applicable to the environment's
+    action space, and (params stage) applicable to the environment's own params."""
+    resolved: list[PerturbationConfig] = []
+    for i, pert in enumerate(config.perturbations):
+        loc: list[str | int] = ["perturbations", i]
+        try:
+            entry = registry.get("perturbation", pert.id)
+        except UnknownIdError as exc:
+            errors.append(_err([*loc, "id"], str(exc.args[0]), "unknown_id"))
+            resolved.append(pert)
+            continue
+        try:
+            params = entry.validate_params(pert.params)
+        except ParamValidationError as exc:
+            errors += [_err([*loc, "params", *e["loc"]], e["msg"], e["type"]) for e in exc.errors]
+            resolved.append(pert)
+            continue
+        resolved.append(pert.model_copy(update={"params": params}))
+        if env_entry is not None:
+            if env_entry.metadata.action_space_kind not in entry.metadata.action_spaces:
+                msg = f"perturbation {pert.id!r} does not apply to environment {env_entry.id!r}"
+                errors.append(_err([*loc, "id"], msg, "incompatible"))
+            elif entry.metadata.stage == "params":
+                try:
+                    cast("type[ParamPerturbation]", entry.cls).apply(env_params, params)
+                except ValueError as exc:
+                    errors.append(_err([*loc, "params"], str(exc), "invalid_configuration"))
+    return resolved
+
+
+def build_env(
+    env_entry: Entry,
+    env_params: dict[str, Any],
+    perturbations: list[PerturbationConfig],
+    registry: Registry,
+    stage: Literal["train", "eval"],
+) -> BaseEnvironment:
+    """Build the environment for ``stage`` with the perturbations whose ``apply_to`` covers it.
+
+    Params-stage perturbations rewrite the constructor params first (list order); step-stage
+    ones then wrap the environment in list order, the first innermost. ``position`` is the index
+    in the full ``perturbations`` list, so seeding does not depend on which stack is built.
+    """
+    active = [
+        (i, p, registry.get("perturbation", p.id))
+        for i, p in enumerate(perturbations)
+        if p.apply_to in (stage, "both")
+    ]
+    for _, p, entry in active:
+        if entry.metadata.stage == "params":
+            env_params = cast("type[ParamPerturbation]", entry.cls).apply(env_params, p.params)
+    env: BaseEnvironment = env_entry.cls(**env_params)
+    for i, p, entry in active:
+        if entry.metadata.stage == "step":
+            env = entry.cls(env, position=i, **p.params)
+    return env
 
 
 def derive_seeds(seed: int) -> dict[str, int]:
@@ -191,10 +259,10 @@ def execute(
     )
 
     def env_factory() -> BaseEnvironment:
-        env: BaseEnvironment = env_entry.cls(**env_params)
-        return env
+        return build_env(env_entry, env_params, resolved.perturbations, reg, "train")
 
-    env = env_factory()
+    env = env_entry.cls(**env_params)  # nominal: the controller is configured on this one
+    eval_env: BaseEnvironment = env
     try:
         controller = ctl_entry.cls()
         controller.configure(env.get_env_spec(), ctl_params, env.get_linearization())
@@ -212,10 +280,14 @@ def execute(
                 controller.save(checkpoint_dir)
         if on_stage:
             on_stage("evaluating")
-        eval_env = eval_wrapper(env) if eval_wrapper is not None else env
+        if any(p.apply_to in ("eval", "both") for p in resolved.perturbations):
+            eval_env = build_env(env_entry, env_params, resolved.perturbations, reg, "eval")
+        if eval_wrapper is not None:
+            eval_env = eval_wrapper(eval_env)
         trajectories = rollout(eval_env, controller, config.evaluation.episodes, seeds["eval"])
         task = env.get_task_spec()
     finally:
+        eval_env.close()
         env.close()
     episode_metrics = [compute_metrics(t, task) for t in trajectories]
     log.info("run done: %s on %s seed=%d", ctl_entry.id, env_entry.id, run_seed)
