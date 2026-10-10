@@ -5,7 +5,7 @@
 
 | Phase | Goal | Exit criteria | Status |
 |-------|------|---------------|--------|
-| 0 | Architecture freeze | 3 review iterations, interfaces frozen, ADRs, import-linter | ☐ |
+| 0 | Architecture freeze | 3 review iterations, interfaces frozen, ADRs, import-linter | ☑ |
 | 1 | MVP vertical slice | Pick env + controller in dashboard, run, see plot + metrics; same seed reproduces | ☐ |
 | 2 | Benchmarking | One command gives PID/LQR/PPO/SAC table + plots with CIs across seeds | ☐ |
 | 3 | PyBullet robots | ≥2 PyBullet robots benchmarked by ≥3 controllers, no controller changes | ☐ |
@@ -33,10 +33,10 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☑ Spike: SB3 trains on a custom env
 - ☑ Spike: FastAPI background job
 - ☑ ADRs (one commit each)
-- ☐ Architecture review iteration 1 → revisions
-- ☐ Architecture review iteration 2 → revisions
-- ☐ Architecture review iteration 3 → mark FROZEN
-- ☐ Tag `phase-0-complete`
+- ☑ Architecture review iteration 1 → revisions
+- ☑ Architecture review iteration 2 → revisions
+- ☑ Architecture review iteration 3 → mark FROZEN
+- ☑ Tag `phase-0-complete`
 
 ## Phase 1 — MVP
 - ☐ Registry implementation + tests

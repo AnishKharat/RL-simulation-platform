@@ -1,6 +1,6 @@
 # Architecture Status
 
-**State: IN REVIEW**  <!-- DRAFT | IN REVIEW | FROZEN -->
+**State: FROZEN**  <!-- DRAFT | IN REVIEW | FROZEN -->
 
 Implementation (anything beyond docs, stubs, spikes) is allowed only when this says FROZEN.
 
@@ -22,4 +22,4 @@ Implementation (anything beyond docs, stubs, spikes) is allowed only when this s
 - ☑ ADR for every major choice
 - ☑ Import-linter rules in place
 
-Frozen on: —
+Frozen on: 2026-10-10 (approved by user)
