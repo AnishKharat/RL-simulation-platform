@@ -79,7 +79,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☑ PyBullet backend
 - ☑ Self-balancing robot environment + tests
 - ☑ Robot arm environment + tests
-- ☐ Rendering/visualization support
+- ☑ Rendering/visualization support (GIF CLI `python -m rcl.benchmark.gif`)
 - ☑ Verify existing controllers run unchanged on new robots (test)
 - ☑ Benchmark results on new robots + docs
 - ☐ Tag `phase-3-complete`
