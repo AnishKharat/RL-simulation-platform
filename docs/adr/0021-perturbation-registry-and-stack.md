@@ -1,6 +1,6 @@
 # 0021. Perturbation registry kind, wrapper stack and parameter variation
 
-- Status: Proposed (architecture review 5; awaiting user approval)
+- Status: Accepted (architecture review 5, user approved 2026-10-11)
 - Date: 2026-10-11
 
 ## Context

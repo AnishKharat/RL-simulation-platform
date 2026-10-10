@@ -1,6 +1,6 @@
 # Phase 4 robustness design (review iteration 5)
 
-Status: proposal, awaiting user approval (ADR 0021). Nothing here is implemented.
+Status: approved 2026-10-11 (ADR 0021 Accepted). Nothing here is implemented.
 
 ## 1. Perturbations as wrappers
 
