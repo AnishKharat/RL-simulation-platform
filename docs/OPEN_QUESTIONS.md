@@ -10,6 +10,9 @@
 
 ## Resolved
 
+- **Q:** Approve ADR 0021 (review 5): new registry Kind `perturbation`, rollout recording, optional sweep in `BenchmarkSpec`/API, and how `disturbance` acts (actuated input vs an `apply_disturbance` hook)? | **Raised by:** orchestrator, review 5, 2026-10-11 | **Affects:** core, registry, rollout, manager, API, Phase 4
+  **Resolved 2026-10-11 (user approved):** ADR 0021 Accepted. `disturbance` acts through the actuator channel; NO `apply_disturbance` hook. Conditions: explicit import-linter contract for `rcl.perturbations`; `config_hash` computed from the spec inputs only (never from recorded `perturbation_steps`); disturbance/clipping order documented.
+
 - **Q:** Approve a new physics layer `rcl.physics` (PhysicsBackend implementations) between the plugin tier and core, which changes the frozen rule "environments import only `core` and `registry`" to "`core`, `registry` and `physics`" (CLAUDE.md 1.3, rcl/environments/CLAUDE.md, project_context 4, import-linter contracts)? Fallback without a rule change: backends as private modules inside `rcl/environments/`. | **Raised by:** orchestrator, review 4, 2026-10-10 | **Affects:** ADR 0019, pyproject contracts, Phase 3
   **Resolved 2026-10-10 (user approved):** `rcl.physics` layer, imports core only, only environments may import it; rule files, project_context 4 and import-linter contracts updated. ADR 0019 Accepted.
 
