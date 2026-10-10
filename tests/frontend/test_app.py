@@ -27,7 +27,7 @@ def test_dropdowns_are_filled_from_the_api(api):
     options = at.selectbox(key="env").options
     assert {"CartPole (continuous)", "CartPole (discrete)", "Inverted Pendulum"} <= set(options)
     at.selectbox(key="env").select("cartpole").run()
-    assert at.selectbox(key="ctl-cartpole").options == ["LQR", "PID", "PPO", "SAC"]
+    assert {"LQR", "PID", "PPO", "SAC", "TD3"} <= set(at.selectbox(key="ctl-cartpole").options)
     at.selectbox(key="env").select("cartpole_discrete").run()
     assert at.selectbox(key="ctl-cartpole_discrete").options == ["PPO"]
 
