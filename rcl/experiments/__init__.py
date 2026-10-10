@@ -8,13 +8,14 @@ from rcl.experiments.benchmark import (
     plan,
     run_benchmark,
 )
-from rcl.experiments.jobs import JobManager
+from rcl.experiments.jobs import JobManager, run_stored_benchmark
 from rcl.experiments.manager import ConfigError, RunResult, derive_seeds, execute, resolve_config
 from rcl.experiments.rollout import rollout
 from rcl.experiments.tracking import MlflowTracker, Tracker
 from rcl.metrics import METRIC_INFO, MetricInfo
 
 __all__ = [
+    "run_stored_benchmark",
     "MlflowTracker",
     "Tracker",
     "BenchmarkResult",

@@ -98,6 +98,16 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "benchmark CLI imports only experiments, analytics, registry, persistence"
+type = "forbidden"
+source_modules = ["rcl.benchmark"]
+allow_indirect_imports = true
+forbidden_modules = [
+    "rcl.environments", "rcl.controllers", "rcl.perturbations", "rcl.ros_adapter",
+    "rcl.metrics", "rcl.frontend", "rcl.api",
+]
+
+[[tool.importlinter.contracts]]
 name = "api imports only experiments, analytics, registry, persistence"
 type = "forbidden"
 source_modules = ["rcl.api"]
@@ -114,7 +124,7 @@ source_modules = ["rcl.frontend"]
 forbidden_modules = [
     "rcl.core", "rcl.registry", "rcl.environments", "rcl.controllers", "rcl.perturbations",
     "rcl.ros_adapter", "rcl.experiments", "rcl.metrics", "rcl.analytics", "rcl.persistence",
-    "rcl.api",
+    "rcl.api", "rcl.benchmark",
 ]
 
 [[tool.importlinter.contracts]]
@@ -122,7 +132,7 @@ name = "layers depend downward only"
 type = "layers"
 layers = [
     "rcl.frontend",
-    "rcl.api",
+    "rcl.api | rcl.benchmark",
     "rcl.experiments",
     "rcl.analytics",
     "rcl.persistence | rcl.metrics",
