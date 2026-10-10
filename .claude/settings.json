@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./mlruns/**)",
+      "Read(./models/**)",
+      "Read(./**/*.db)",
+      "Read(./.venv/**)",
+      "Read(./graphify-out/cache/**)",
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ]
+  }
+}
