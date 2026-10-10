@@ -427,3 +427,39 @@ class Repository:
         )
         with self._session() as s:
             return [dict(zip(keys, row, strict=True)) for row in s.execute(q)]
+
+    # --- tracker links ----------------------------------------------------------------------
+    def link_checkpoint(self, run_id: str, checkpoint_dir: Path, mlflow_run_id: str | None) -> None:
+        """Record a run's checkpoint directory (pointer, never the weights) and, if the run was
+        also logged to MLflow, the MLflow run id (ARTIFACT.mlflow_run_id)."""
+        digest, size = hashlib.sha256(), 0
+        for f in sorted(p for p in checkpoint_dir.rglob("*") if p.is_file()):
+            blob = f.read_bytes()
+            digest.update(f.relative_to(checkpoint_dir).as_posix().encode() + blob)
+            size += len(blob)
+        with self._session.begin() as s:
+            s.add(
+                ArtifactRow(
+                    id=_id(),
+                    run_id=run_id,
+                    kind="checkpoint",
+                    uri=str(checkpoint_dir.resolve()),
+                    sha256=digest.hexdigest(),
+                    size_bytes=size,
+                    mlflow_run_id=mlflow_run_id,
+                )
+            )
+
+    def get_artifacts(self, run_id: str) -> list[dict[str, Any]]:
+        with self._session() as s:
+            rows = s.scalars(select(ArtifactRow).where(ArtifactRow.run_id == run_id))
+            return [
+                {
+                    "kind": a.kind,
+                    "uri": a.uri,
+                    "sha256": a.sha256,
+                    "size_bytes": a.size_bytes,
+                    "mlflow_run_id": a.mlflow_run_id,
+                }
+                for a in rows
+            ]
