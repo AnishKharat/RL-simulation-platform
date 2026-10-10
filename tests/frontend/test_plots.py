@@ -56,3 +56,19 @@ def test_curve_and_tables():
         {"metric": "return", "value": 3.0, "unit": "r", "status": "ok"}
     ]
     assert [(r["index"], r["return"]) for r in plots.episode_table(run)] == [(0, 2.0), (1, 4.0)]
+
+
+def test_signal_selection_and_defaults_for_many_joint_robots():
+    assert plots.signal_names(TRAJ) == ["x [m]", "v [m/s]", "force [N]", "reward"]
+    assert plots.default_signals(TRAJ) == plots.signal_names(TRAJ)  # few signals: all
+    fig = plots.trajectory_figure(TRAJ, ["v [m/s]", "reward"])
+    assert [a.text for a in fig.layout.annotations] == ["v [m/s]", "reward"] and len(fig.data) == 2
+    many = {
+        **TRAJ,
+        "states": [[float(i)] * 12 for i in range(3)],
+        "state_labels": [f"s{i}" for i in range(12)],
+        "state_units": [""] * 12,
+    }
+    assert plots.default_signals(many) == ["s0", "s1", "s2", "s3", "force [N]", "reward"]
+    assert len(plots.trajectory_figure(many).data) == 14  # None = everything
+    assert len(plots.trajectory_figure(TRAJ, []).data) == 0
