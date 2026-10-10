@@ -13,6 +13,25 @@ class Base(DeclarativeBase):
     pass
 
 
+class BenchmarkSuiteRow(Base):
+    __tablename__ = "benchmark_suite"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    name: Mapped[str]
+    spec: Mapped[dict[str, Any]] = mapped_column(JSON)  # controllers x envs x seeds, verbatim
+    created_at: Mapped[datetime]
+
+
+class BenchmarkRunRow(Base):
+    __tablename__ = "benchmark_run"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    suite_id: Mapped[str] = mapped_column(ForeignKey("benchmark_suite.id"), index=True)
+    status: Mapped[str]  # queued running done failed
+    progress: Mapped[float] = mapped_column(default=0.0)
+    error: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    started_at: Mapped[datetime | None]
+    finished_at: Mapped[datetime | None]
+
+
 class ExperimentRow(Base):
     __tablename__ = "experiment"
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
@@ -22,6 +41,7 @@ class ExperimentRow(Base):
     config: Mapped[dict[str, Any]] = mapped_column(JSON)
     config_hash: Mapped[str]
     created_at: Mapped[datetime]
+    suite_id: Mapped[str | None] = mapped_column(ForeignKey("benchmark_suite.id"), index=True)
 
 
 class RunRow(Base):
