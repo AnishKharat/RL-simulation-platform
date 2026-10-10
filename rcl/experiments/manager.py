@@ -32,7 +32,7 @@ from rcl.registry import (
 )
 
 log = logging.getLogger(__name__)
-_LIBS = ("numpy", "gymnasium", "pydantic", "stable-baselines3", "torch", "rcl")
+_LIBS = ("numpy", "gymnasium", "pydantic", "stable-baselines3", "torch", "pybullet", "rcl")
 
 
 @dataclass

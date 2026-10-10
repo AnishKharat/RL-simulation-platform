@@ -75,8 +75,8 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☐ Tag `phase-2-complete`
 
 ## Phase 3 — Advanced Robotics
-- ☐ `PhysicsBackend` abstraction + tests
-- ☐ PyBullet backend
+- ☑ `PhysicsBackend` abstraction + tests
+- ☑ PyBullet backend
 - ☐ Self-balancing robot environment + tests
 - ☐ Robot arm environment + tests
 - ☐ Rendering/visualization support

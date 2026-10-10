@@ -45,8 +45,8 @@ def test_a_conforming_class_satisfies_the_protocol_and_others_do_not():
 
 
 def test_core_physics_imports_no_simulator():
+    import subprocess
     import sys
 
-    import rcl.core.physics  # noqa: F401
-
-    assert "pybullet" not in sys.modules and "mujoco" not in sys.modules
+    code = "import sys, rcl.core.physics; assert not {'pybullet', 'mujoco'} & set(sys.modules)"
+    assert subprocess.run([sys.executable, "-c", code]).returncode == 0  # fresh interpreter
