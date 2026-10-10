@@ -24,12 +24,9 @@ def api(tmp_path):
 def test_dropdowns_are_filled_from_the_api(api):
     at = AppTest.from_file(APP, default_timeout=30).run()
     assert not at.exception
-    assert at.selectbox(key="env").options == [
-        "CartPole (continuous)",
-        "CartPole (discrete)",
-        "Inverted Pendulum",
-    ]
-    assert at.selectbox(key="env").value == "cartpole"
+    options = at.selectbox(key="env").options
+    assert {"CartPole (continuous)", "CartPole (discrete)", "Inverted Pendulum"} <= set(options)
+    at.selectbox(key="env").select("cartpole").run()
     assert at.selectbox(key="ctl-cartpole").options == ["LQR", "PID", "PPO", "SAC"]
     at.selectbox(key="env").select("cartpole_discrete").run()
     assert at.selectbox(key="ctl-cartpole_discrete").options == ["PPO"]
@@ -37,6 +34,7 @@ def test_dropdowns_are_filled_from_the_api(api):
 
 def test_run_from_the_form_reaches_done(api):
     at = AppTest.from_file(APP, default_timeout=120).run()
+    at.selectbox(key="env").select("cartpole").run()
     at.selectbox(key="ctl-cartpole").select("pid").run()
     at.number_input(key="controller-pid.kp").set_value(55.0)
     at.number_input(key="episodes").set_value(2)
@@ -57,6 +55,7 @@ def test_run_from_the_form_reaches_done(api):
 
 def test_server_validation_error_shown_next_to_the_widget(api):
     at = AppTest.from_file(APP, default_timeout=60).run()
+    at.selectbox(key="env").select("cartpole").run()
     at.selectbox(key="ctl-cartpole").select("pid").run()
     at.number_input(key="controller-pid.integral_limit").set_value(0.0)  # schema: > 0 (exclusive)
     at.button[0].click().run()

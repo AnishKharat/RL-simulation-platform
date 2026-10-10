@@ -4,13 +4,11 @@ def ids(resp):
 
 
 def test_lists_are_sorted_and_carry_forms_and_labels(client):
-    assert ids(client.get("/environments")) == [
-        "cartpole",
-        "cartpole_discrete",
-        "inverted_pendulum",
-    ]
+    envs = ids(client.get("/environments"))
+    assert envs == sorted(envs)  # optional-extra robots (e.g. PyBullet) may add entries
+    assert {"cartpole", "cartpole_discrete", "inverted_pendulum"} <= set(envs)
     assert ids(client.get("/controllers")) == ["lqr", "pid", "ppo", "sac"]
-    env = client.get("/environments").json()[0]
+    env = next(e for e in client.get("/environments").json() if e["id"] == "cartpole")
     assert env["kind"] == "environment" and env["metadata"]["state_labels"]
     assert env["params_schema"]["properties"]["force_mag"]["default"] == 10.0
     ppo = next(c for c in client.get("/controllers").json() if c["id"] == "ppo")
