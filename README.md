@@ -52,6 +52,13 @@ PyBullet 3.2.7 publishes a wheel only for Linux CPython 3.11. On other platforms
 source, which needs a C++ compiler (on Windows, the Visual Studio Build Tools). Without the extra these robots simply
 do not appear in the registry, and everything else works. Results and specs are in `docs/benchmarks/phase3/`.
 
+Render one evaluation episode (episode 0 of a benchmark run with the same seed) to a GIF (needs the `render` extra):
+
+```bash
+pip install -e ".[physics,render]"
+python -m rcl.benchmark.gif --env balance_bot --controller lqr --seed 0 --out balance_bot_lqr.gif
+```
+
 ## Add a robot or controller (one file)
 
 Drop a module into `rcl/environments/` (or `rcl/controllers/`) with a registry decorator:

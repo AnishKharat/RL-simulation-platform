@@ -164,13 +164,15 @@ def execute(
     checkpoint_dir: Path | None = None,
     on_stage: Callable[[str], None] | None = None,
     progress: Callable[[int, int], bool | None] | None = None,
+    eval_wrapper: Callable[[BaseEnvironment], BaseEnvironment] | None = None,
 ) -> RunResult:
     """Run one experiment end to end.
 
     ``seed`` overrides ``config.seed`` for this run. Raises ``ConfigError`` (see
     :func:`resolve_config`) before any work starts. ``on_stage`` is
     called with ``"training"`` / ``"evaluating"``; ``progress`` is forwarded to training.
-    If ``checkpoint_dir`` is given a trained controller is saved there.
+    If ``checkpoint_dir`` is given a trained controller is saved there. ``eval_wrapper`` wraps
+    the evaluation environment only (e.g. a frame recorder); it must not change dynamics.
     """
     reg = registry or get_registry()
     resolved, env_entry, ctl_entry = resolve_config(config, reg)
@@ -210,7 +212,8 @@ def execute(
                 controller.save(checkpoint_dir)
         if on_stage:
             on_stage("evaluating")
-        trajectories = rollout(env, controller, config.evaluation.episodes, seeds["eval"])
+        eval_env = eval_wrapper(env) if eval_wrapper is not None else env
+        trajectories = rollout(eval_env, controller, config.evaluation.episodes, seeds["eval"])
         task = env.get_task_spec()
     finally:
         env.close()
