@@ -8,7 +8,7 @@ version = "0.0.1"
 description = "Robotics Control Lab: benchmark classical and RL controllers on simulated robots."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["pydantic>=2", "numpy", "gymnasium", "sqlalchemy"]
+dependencies = ["pydantic>=2", "numpy>=2", "gymnasium", "sqlalchemy"]
 
 [project.optional-dependencies]
 rl = ["stable-baselines3"]
