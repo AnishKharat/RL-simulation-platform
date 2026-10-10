@@ -9,16 +9,17 @@ def test_lists_are_sorted_and_carry_forms_and_labels(client):
         "cartpole_discrete",
         "inverted_pendulum",
     ]
-    assert ids(client.get("/controllers")) == ["pid", "ppo"]
+    assert ids(client.get("/controllers")) == ["lqr", "pid", "ppo"]
     env = client.get("/environments").json()[0]
     assert env["kind"] == "environment" and env["metadata"]["state_labels"]
     assert env["params_schema"]["properties"]["force_mag"]["default"] == 10.0
-    ppo = client.get("/controllers").json()[1]
+    ppo = next(c for c in client.get("/controllers").json() if c["id"] == "ppo")
     assert ppo["metadata"]["requires_training"] is True and ppo["params_schema"]["properties"]
 
 
 def test_compatible_controllers(client):
     assert ids(client.get("/controllers/compatible", params={"env_id": "cartpole"})) == [
+        "lqr",
         "pid",
         "ppo",
     ]
