@@ -52,6 +52,14 @@ All use the error signal above. Define the normalized step progress `p_k = <w_k,
 
 **control_effort.** `sum_{k=0}^{T-1} ||u_k||_2 * dt` (action-unit s), the time-integrated action magnitude. Also reported: `control_effort_rate = sum_{k=1}^{T-1} ||u_k - u_{k-1}||_2` (smoothness; 0 when T < 2), same units without `dt`.
 
+## Phase 3 additions: task outcome (headline metrics)
+
+Both read the rollout's success verdict (`EpisodeTrajectory.success`: the `TaskSpec` tolerance held for `success_hold_steps = h` consecutive steps; success ends the episode with `terminated = truncated = False`).
+
+- **success_rate.** Per episode `1.0` if `success` else `0.0` (unit `fraction`). The per-run value (the mean over the evaluation episodes) is the success rate of that run; across seeds the interval is a seeded percentile bootstrap (a binary mean can leave [0, 1] under a t-interval).
+- **time_to_success.** `(T - h + 1) * dt` for a successful episode: the time at which the final in-tolerance streak began (clamped at 0). An episode without success, including one ended by failure, is `T_max = horizon_steps * dt` with status `censored`, the same convention as settling_time; the per-run mean therefore mixes real times and bounds, and the report shows `n_censored`. Bootstrap interval across seeds.
+- **`return` is not the headline metric.** Success ends an episode early, so a controller that succeeds quickly collects fewer reward steps than one that never succeeds. Reports lead with these two metrics (`MetricInfo.headline`) and say so.
+
 ## Phase 4 metrics (future, not implemented before Phase 4)
 
 - **failure_count:** number of episodes in a perturbation suite with `terminated = true` (task failure per `TaskSpec`), reported as a count and as a rate over episodes.

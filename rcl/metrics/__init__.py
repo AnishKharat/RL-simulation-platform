@@ -13,9 +13,12 @@ from rcl.metrics.metrics import (
     episode_return,
     wrap_angle,
 )
+from rcl.metrics.outcome import success_rate, time_to_success
 
 # Phase 2 metrics join the manager's fixed list (selected by the manager, never by users).
 METRICS.update(
+    success_rate=success_rate,  # same order as METRIC_INFO below
+    time_to_success=time_to_success,
     settling_time=settling_time,
     rise_time=rise_time,
     overshoot=overshoot,
@@ -25,6 +28,22 @@ METRICS.update(
 )
 METRIC_INFO.extend(
     [
+        MetricInfo(
+            name="success_rate",
+            description="Fraction of episodes in which the task tolerance was held (headline).",
+            unit="fraction",
+            higher_is_better=True,
+            ci_method="bootstrap",
+            headline=True,
+        ),
+        MetricInfo(
+            name="time_to_success",
+            description="Time at which the successful in-tolerance streak began (censored: T_max).",
+            unit="s",
+            higher_is_better=False,
+            ci_method="bootstrap",
+            headline=True,
+        ),
         MetricInfo(
             name="settling_time",
             description="Time until the error stays within 2% of the step size (censored: T_max).",
