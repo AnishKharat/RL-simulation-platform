@@ -12,7 +12,7 @@
 | 4 | Robustness | Perturbation wrappers, robustness metrics, robustness suite | ☐ |
 | 5 | Professional platform | Next.js UI, Postgres, MLflow server, Docker Compose, CI/CD, basic auth | ☐ |
 | 6 | Research-grade | MuJoCo backend, MPC, higher-fidelity models | ☐ |
-| 7 | Sim-to-real | ROS2 adapter behind `BaseEnvironment`, policy export, safety layer | ☐ |
+| 7 | Sim-to-real (out of scope for now: platform is simulation-only) | ROS2 adapter behind `BaseEnvironment`, policy export, safety layer | ☐ |
 
 Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summary>"`.
 

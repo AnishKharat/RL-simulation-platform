@@ -225,7 +225,7 @@ Implemented as `rcl.core.config.ExperimentConfig` (flat, no `experiment:` wrappe
 - MuJoCo backend via `PhysicsBackend`
 - Advanced robot models, higher-fidelity simulation, MPC controller
 
-### Phase 7 — Sim-to-Real
+### Phase 7 — Sim-to-Real (out of scope for now: the platform is simulation-only)
 - ROS2 adapter implementing the same `BaseEnvironment` interface for real hardware
 - Policy export/deployment, safety limits layer
 - Architecture: Simulation → Policy → ROS2 → Robot
