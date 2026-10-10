@@ -70,7 +70,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☑ Analytics: comparison tables
 - ☑ Analytics: statistical summaries / confidence intervals
 - ☑ MLflow integration
-- ☐ Comparison dashboard page
+- ☑ Comparison dashboard page
 - ☐ Report export (Markdown/HTML)
 - ☐ Tag `phase-2-complete`
 

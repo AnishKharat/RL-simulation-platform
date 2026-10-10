@@ -64,3 +64,58 @@ def episode_table(run: dict[str, Any]) -> list[dict[str, Any]]:
         if m["episode_index"] is not None:
             per_episode[m["episode_index"]][m["metric_name"]] = m["value"]
     return [per_episode[i] for i in sorted(per_episode)]
+
+
+def comparison_figure(
+    rows: list[dict[str, Any]], metric: str, unit: str | None = None
+) -> go.Figure:
+    """Bars of the cross-seed mean per controller with 95% interval whiskers.
+
+    ``rows`` are API ``SummaryOut`` dicts of one environment; only ``metric`` is drawn.
+    Controllers whose interval is undefined (fewer than two seeds) are drawn without whiskers.
+    """
+    sel = sorted((r for r in rows if r["metric_name"] == metric), key=lambda r: r["controller_id"])
+    means = [r["mean"] for r in sel]
+    up = [r["ci_high"] - r["mean"] if r["ci_high"] is not None else 0.0 for r in sel]
+    down = [r["mean"] - r["ci_low"] if r["ci_low"] is not None else 0.0 for r in sel]
+    fig = go.Figure(
+        go.Bar(
+            x=[r["controller_id"] for r in sel],
+            y=means,
+            error_y={"type": "data", "symmetric": False, "array": up, "arrayminus": down},
+        )
+    )
+    unit = unit or (sel[0]["unit"] if sel else "")
+    fig.update_layout(
+        yaxis_title=f"{metric} [{unit}]" if unit else metric, xaxis_title="controller", height=380
+    )
+    return fig
+
+
+def _fmt(v: float | None) -> str:
+    return "n/a" if v is None else f"{v:.4g}"
+
+
+def summary_table(rows: list[dict[str, Any]], metric: str | None = None) -> list[dict[str, Any]]:
+    """One display row per (controller, metric): mean, interval, seed counts and warnings."""
+    out = []
+    for r in rows:
+        if metric is not None and r["metric_name"] != metric:
+            continue
+        notes = []
+        if r["low_n"]:
+            notes.append("fewer than 5 seeds")
+        if r["n_censored"]:
+            notes.append(f"{r['n_censored']} censored")
+        out.append(
+            {
+                "controller": r["controller_id"],
+                "metric": r["metric_name"],
+                "mean": _fmt(r["mean"]),
+                "95% interval": f"[{_fmt(r['ci_low'])}, {_fmt(r['ci_high'])}] ({r['ci_method']})",
+                "seeds (valid/total)": f"{r['n_valid']}/{r['n_total']}",
+                "unit": r["unit"],
+                "notes": ", ".join(notes),
+            }
+        )
+    return out

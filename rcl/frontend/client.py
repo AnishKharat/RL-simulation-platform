@@ -47,3 +47,29 @@ def run(run_id: str) -> dict[str, Any]:
 
 def trajectory(run_id: str, episode: int) -> dict[str, Any]:
     return dict(_get(f"/runs/{run_id}/trajectory/{episode}"))
+
+
+def controllers() -> list[dict[str, Any]]:
+    return list(_get("/controllers"))
+
+
+def metrics() -> list[dict[str, Any]]:
+    return list(_get("/metrics"))
+
+
+def create_benchmark(spec: dict[str, Any]) -> tuple[int, Any]:
+    """POST a benchmark spec; returns ``(status_code, json)`` (422 bodies list the problems)."""
+    r = _http().post("/benchmarks", json=spec)
+    return r.status_code, r.json()
+
+
+def benchmarks() -> list[dict[str, Any]]:
+    return list(_get("/benchmarks"))
+
+
+def benchmark(suite_id: str) -> dict[str, Any]:
+    return dict(_get(f"/benchmarks/{suite_id}"))
+
+
+def benchmark_summary(suite_id: str, env_id: str | None = None) -> list[dict[str, Any]]:
+    return list(_get(f"/benchmarks/{suite_id}/summary", **({"env_id": env_id} if env_id else {})))
