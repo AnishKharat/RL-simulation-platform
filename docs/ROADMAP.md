@@ -81,7 +81,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☑ Robot arm environment + tests
 - ☐ Rendering/visualization support
 - ☑ Verify existing controllers run unchanged on new robots (test)
-- ☐ Benchmark results on new robots + docs
+- ☑ Benchmark results on new robots + docs
 - ☐ Tag `phase-3-complete`
 
 ## Phases 4–7
