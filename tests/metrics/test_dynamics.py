@@ -123,3 +123,19 @@ def test_overshoot_zero_when_monotone_and_undefined_for_tiny_step():
     assert m.value == 0.0 and m.status == "ok" and m.unit == "%"
     assert overshoot(traj([0.01, 0.0]), task()).status == "undefined"
     assert overshoot(traj([1.0, np.inf]), task()).status == "undefined"
+
+
+def test_steady_state_error_uses_last_ten_percent_window():
+    from rcl.metrics.dynamics import steady_state_error
+
+    theta = [1.0] * 9 + [0.2, 0.4]  # 11 samples -> window ceil(1.1) = 2
+    m = steady_state_error(traj(theta), task())
+    assert m.value == pytest.approx(0.3) and m.unit == "rad" and m.status == "ok"
+    assert steady_state_error(traj([0.5, 0.25]), task()).value == pytest.approx(0.25)  # window 1
+
+
+def test_steady_state_error_censored_on_failure_and_undefined_on_nan():
+    from rcl.metrics.dynamics import steady_state_error
+
+    assert steady_state_error(traj([0.0, 0.5], terminated=True), task()).status == "censored"
+    assert steady_state_error(traj([0.0, np.nan]), task()).status == "undefined"

@@ -5,6 +5,8 @@ Definitions: rcl/metrics/DEFINITIONS.md "Phase 2 metrics". Pure functions over a
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
 from rcl.core.types import EpisodeTrajectory, TaskSpec
@@ -114,3 +116,19 @@ def overshoot(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
     if p is None:
         return _undefined("overshoot", "%")
     return MetricValue(name="overshoot", value=100.0 * max(0.0, float(p.max()) - 1.0), unit="%")
+
+
+def steady_state_error(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
+    """Mean error over the last max(1, ceil(0.1 * (T + 1))) samples; censored if the episode
+    ended in failure (the system never reached steady state)."""
+    unit = task.output_unit or ""
+    if not _check(traj):
+        return _undefined("steady_state_error", unit)
+    e, _, _, _ = _geometry(traj, task)
+    window = max(1, math.ceil(0.1 * len(e)))
+    return MetricValue(
+        name="steady_state_error",
+        value=float(e[-window:].mean()),
+        unit=unit,
+        status="censored" if traj.terminated else "ok",
+    )
