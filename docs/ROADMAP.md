@@ -55,7 +55,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☑ Streamlit app skeleton (dropdowns from API)
 - ☑ Streamlit: parameter forms from schemas
 - ☑ Streamlit: results + Plotly charts
-- ☐ Modularity proof (commit as `test(env): prove 1-file extensibility`): a test writes a dummy environment (one file, one decorator) into a temporary package outside `rcl/environments` and calls `discover(packages=[tmp_pkg])` on an isolated `Registry`; at API level, with `TestClient`, the new id must appear in `GET /environments`, `POST /experiments` with a compatible controller must return 202, and the run must reach `done`. No dummy environment is ever added to `rcl/environments`.
+- ☑ Modularity proof (commit as `test(env): prove 1-file extensibility`): a test writes a dummy environment (one file, one decorator) into a temporary package outside `rcl/environments` and calls `discover(packages=[tmp_pkg])` on an isolated `Registry`; at API level, with `TestClient`, the new id must appear in `GET /environments`, `POST /experiments` with a compatible controller must return 202, and the run must reach `done`. No dummy environment is ever added to `rcl/environments`.
 - ☐ README quickstart + screenshots
 - ☐ Tag `phase-1-complete`
 
