@@ -33,3 +33,29 @@ def test_dropdowns_are_filled_from_the_api(api):
     assert at.selectbox(key="ctl-cartpole").options == ["PID", "PPO"]
     at.selectbox(key="env").select("cartpole_discrete").run()
     assert at.selectbox(key="ctl-cartpole_discrete").options == ["PPO"]
+
+
+def test_run_from_the_form_reaches_done(api):
+    at = AppTest.from_file(APP, default_timeout=120).run()
+    at.number_input(key="controller-pid.kp").set_value(55.0)
+    at.number_input(key="episodes").set_value(2)
+    at.button[0].click().run()
+    assert not at.exception
+    assert any("done" in s.value for s in at.success)
+    run_id = at.session_state["run_id"]
+    body = api.get(f"/runs/{run_id}").json()
+    assert body["status"] == "done" and len(body["episodes"]) == 2
+    assert (
+        api.get(f"/experiments/{body['experiment_id']}").json()["config"]["controller"]["params"][
+            "kp"
+        ]
+        == 55.0
+    )
+
+
+def test_server_validation_error_shown_next_to_the_widget(api):
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    at.number_input(key="controller-pid.integral_limit").set_value(0.0)  # schema: > 0 (exclusive)
+    at.button[0].click().run()
+    assert not at.exception and at.session_state["run_id"] is None
+    assert any(":red[" in c.value for c in at.caption)
