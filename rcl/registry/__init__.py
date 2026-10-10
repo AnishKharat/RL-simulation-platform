@@ -13,6 +13,7 @@ from rcl.registry.registry import (
     get_registry,
     register_controller,
     register_environment,
+    register_perturbation,
     use_registry,
 )
 
@@ -29,5 +30,6 @@ __all__ = [
     "get_registry",
     "register_controller",
     "register_environment",
+    "register_perturbation",
     "use_registry",
 ]

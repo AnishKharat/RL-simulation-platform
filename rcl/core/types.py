@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Literal
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -143,6 +144,27 @@ class ControllerMetadata(_Spec):
     requires_training: bool
     requires_linearization: bool = False
     max_action_dim: int | None = Field(default=None, ge=1)
+
+
+class PerturbationMetadata(_Spec):
+    """Static description of a perturbation (ADR 0021), the basis of API and dashboard forms.
+
+    `stage` is "step" (an in-episode `EnvWrapper`) or "params" (rewrites environment params
+    before construction). `magnitude_param` names the scalar parameter that a robustness sweep
+    varies, `nominal_magnitude` its no-perturbation value and `magnitude_unit` its unit.
+    `action_spaces` lists the environment action kinds the perturbation applies to."""
+
+    name: str
+    version: str = Field(min_length=1)
+    description: str = ""
+    stage: Literal["step", "params"]
+    magnitude_param: str = Field(min_length=1)
+    magnitude_unit: str = ""
+    nominal_magnitude: float
+    action_spaces: tuple[ActionSpaceKind, ...] = (
+        ActionSpaceKind.CONTINUOUS,
+        ActionSpaceKind.DISCRETE,
+    )
 
 
 class TaskSpec(_Spec):
