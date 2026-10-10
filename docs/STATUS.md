@@ -2,11 +2,13 @@
 
 > Read this FIRST every session. Keep under ~20 lines. Overwrite, don't append history (git log is the history).
 
-- **Current phase:** 3 tagged `phase-3-complete` (22f8d16; tag deliberately left in place). Follow-up branch `phase-3/arm-followup` merged. No Phase 4 work started. Architecture FROZEN
-- **Follow-up done:** TD3 wrapper (`rcl/controllers/rl/td3.py`, exploration-noise param), headline metrics `success_rate` and `time_to_success` (reports and dashboard lead with them; `return` is flagged as not the headline), 30k-step arm benchmark PPO/SAC/TD3 x 5 seeds (~67 min), honest Phase 3 benchmark README
-- **Exit criterion ("2 PyBullet robots, each by >= 3 controllers"):** met BY COUNT ONLY. `balance_bot`: 4 controllers, LQR succeeds 25/25. `planar_arm`: 3 controllers (ppo, sac, td3) but **0/75 episodes succeed**; only SAC clearly beats the zero-torque baseline (0.47 vs 0.89 m RMS error)
-- **Remaining (user to decide):** make an arm controller actually reach the target (more steps, reward shaping or tuning; not attempted), or accept as is. Phase 4 is next only when you say so
-- **Decision (user):** accept the arm as a count-only result, no further arm tuning now. Arm RL controllers do not reach target; optional time-boxed reward-shaping attempt later.
-- **Env:** project `.venv` (`--system-site-packages`); PyBullet only in `.venv`; checks via `.venv/Scripts/python`
-- **Checks:** pytest 299 pass (venv) | ruff clean | mypy clean | lint-imports 11 kept
-- **Last updated:** 2026-10-10 by orchestrator
+- **Current phase:** 4 (Robustness) in progress on `main`. `phase-3-complete` stays as tagged. Do NOT tag `phase-4-complete` until the user confirms
+- **Architecture:** FROZEN again after review iteration 5 (2026-10-11). ADR 0021 Accepted: registry kind `perturbation`, `StepPerturbation`/`ParamPerturbation` in core, disturbance via the actuator channel (no `apply_disturbance`). Design: `docs/architecture/phase4-robustness.md`
+- **Stage 0 and Stage 1 done and merged:** perturbation kind + import-linter contract, five perturbations (`obs_noise`, `action_noise`, `action_delay`, `disturbance`, `param_scale`), manager builds train/eval stacks, rollout records `perturbation_steps`, spec-only `config_hash` test
+- **Next (Stage 2):** robustness metrics (failure_count, recovery_time, degradation curves) as pure functions matching `rcl/metrics/DEFINITIONS.md`. Then Stage 3 suite runner, 4 API + dashboard, 5 modularity proof, 6 benchmark (balance_bot, CartPole; skip planar_arm), then one opus review
+- **To document at Stage 6:** the disturbance is applied before the environment's clipping and saturates at the actuator limit (docs/benchmarks/phase4/README.md)
+- **Known limits:** `obs_noise` std is in absolute observation units; `param_scale` is one value per run; no PyBullet run with perturbations yet; CI status not checked (no `gh` here)
+- **Phase 7:** marked out of scope for now (simulation-only)
+- **Env:** project `.venv`; checks via `.venv/Scripts/python`
+- **Checks:** pytest 0 pass | ruff clean | mypy clean | lint-imports 12 kept
+- **Last updated:** 2026-10-11 by orchestrator
