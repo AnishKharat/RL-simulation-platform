@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 from collections.abc import AsyncIterator, Collection
 from contextlib import asynccontextmanager
@@ -9,21 +10,29 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 
+from rcl.analytics import SummaryRow, paired_difference, summarize
 from rcl.api.schemas import (
+    BenchmarkDetail,
+    BenchmarkSummaryItem,
+    CreatedBenchmark,
     CreatedExperiment,
     EntryInfo,
     ExperimentDetail,
     RunDetail,
+    SkippedPair,
+    SummaryOut,
     TrajectoryOut,
 )
 from rcl.core.config import ExperimentConfig
 from rcl.experiments import (
     METRIC_INFO,
+    BenchmarkSpec,
     ConfigError,
     JobManager,
     MetricInfo,
     MlflowTracker,
     derive_seeds,
+    plan,
     resolve_config,
 )
 from rcl.persistence import Repository
@@ -154,7 +163,61 @@ def create_app(
             **labels,
         }
 
+    @app.post("/benchmarks", status_code=202, response_model=CreatedBenchmark)
+    def create_benchmark(request: Request, spec: BenchmarkSpec) -> CreatedBenchmark:
+        st = request.app.state
+        try:
+            _, skipped = plan(spec, st.registry)
+        except ConfigError as exc:
+            detail = [{**e, "loc": ["body", *e["loc"]]} for e in exc.errors]
+            raise HTTPException(422, detail) from None
+        suite_id, bench_id = st.repo.create_suite(spec.name, spec.model_dump(mode="json"))
+        st.jobs.submit_benchmark(bench_id, suite_id, spec)
+        return CreatedBenchmark(
+            suite_id=suite_id,
+            benchmark_run_id=bench_id,
+            skipped=[SkippedPair(**vars(k)) for k in skipped],
+        )
+
+    @app.get("/benchmarks", response_model=list[BenchmarkSummaryItem])
+    def list_benchmarks(request: Request) -> list[dict[str, Any]]:
+        return request.app.state.repo.list_suites()  # type: ignore[no-any-return]
+
+    @app.get("/benchmarks/{suite_id}", response_model=BenchmarkDetail)
+    def get_benchmark(request: Request, suite_id: str) -> dict[str, Any]:
+        found = request.app.state.repo.get_suite(suite_id)
+        if found is None:
+            raise HTTPException(404, f"unknown benchmark {suite_id!r}")
+        return found  # type: ignore[no-any-return]
+
+    @app.get("/benchmarks/{suite_id}/summary", response_model=list[SummaryOut])
+    def benchmark_summary(
+        request: Request, suite_id: str, env_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        repo = request.app.state.repo
+        if repo.get_suite(suite_id) is None:
+            raise HTTPException(404, f"unknown benchmark {suite_id!r}")
+        rows = summarize(repo.suite_metric_rows(suite_id))
+        return [_summary_out(r) for r in rows if env_id is None or r.env_id == env_id]
+
+    @app.get("/benchmarks/{suite_id}/paired", response_model=SummaryOut)
+    def benchmark_paired(
+        request: Request, suite_id: str, env_id: str, metric: str, a: str, b: str
+    ) -> dict[str, Any]:
+        repo = request.app.state.repo
+        if repo.get_suite(suite_id) is None:
+            raise HTTPException(404, f"unknown benchmark {suite_id!r}")
+        rows = repo.suite_metric_rows(suite_id)
+        return _summary_out(paired_difference(rows, env_id, metric, a, b))
+
     return app
+
+
+def _summary_out(row: SummaryRow) -> dict[str, Any]:
+    """Dataclass -> JSON-safe dict (NaN is not valid JSON, so it becomes null)."""
+    return {
+        k: (None if isinstance(v, float) and math.isnan(v) else v) for k, v in vars(row).items()
+    }
 
 
 app = create_app()

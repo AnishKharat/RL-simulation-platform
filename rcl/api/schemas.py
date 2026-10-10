@@ -93,3 +93,66 @@ class TrajectoryOut(BaseModel):
     state_units: list[str]
     action_labels: list[str]
     action_units: list[str]
+
+
+class SkippedPair(BaseModel):
+    env_id: str
+    controller_id: str
+    reason: str
+
+
+class CreatedBenchmark(BaseModel):
+    suite_id: str
+    benchmark_run_id: str
+    status: Literal["queued"] = "queued"
+    skipped: list[SkippedPair]
+
+
+class BenchmarkRunOut(BaseModel):
+    benchmark_run_id: str
+    status: Literal["queued", "running", "done", "failed"]
+    progress: float
+
+
+class BenchmarkRunInfo(BaseModel):
+    run_id: str
+    seed: int
+    status: Literal["queued", "running", "done", "failed"]
+
+
+class BenchmarkCell(BaseModel):
+    experiment_id: str
+    env_id: str
+    controller_id: str
+    config_hash: str
+    runs: list[BenchmarkRunInfo]
+
+
+class BenchmarkSummaryItem(BaseModel):
+    suite_id: str
+    name: str
+    created_at: datetime
+
+
+class BenchmarkDetail(BenchmarkSummaryItem):
+    spec: dict[str, Any]
+    benchmark_runs: list[BenchmarkRunOut]
+    experiments: list[BenchmarkCell]
+
+
+class SummaryOut(BaseModel):
+    """Cross-seed summary of one metric for one cell; NaN values are sent as null."""
+
+    env_id: str
+    controller_id: str
+    metric_name: str
+    unit: str
+    n_valid: int
+    n_total: int
+    n_censored: int
+    mean: float | None
+    std: float | None
+    ci_low: float | None
+    ci_high: float | None
+    ci_method: str
+    low_n: bool
