@@ -46,7 +46,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☑ Inverted Pendulum (balance) + tests
 - ☑ PID controller + tests
 - ☐ PPO wrapper (SB3) + tests
-- ☐ Metrics: reward, angle error + tests
+- ☑ Metrics: reward, angle error + tests
 - ☐ Experiment Manager (config → run → trajectory) + tests
 - ☐ Seeding / reproducibility test
 - ☐ Persistence models + repository (SQLAlchemy/SQLite) + tests
