@@ -67,8 +67,8 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☑ Metrics: energy usage, control effort
 - ☑ Benchmark runner (controllers × envs × seeds) + tests
 - ☑ Benchmark result persistence
-- ☐ Analytics: comparison tables
-- ☐ Analytics: statistical summaries / confidence intervals
+- ☑ Analytics: comparison tables
+- ☑ Analytics: statistical summaries / confidence intervals
 - ☐ MLflow integration
 - ☐ Comparison dashboard page
 - ☐ Report export (Markdown/HTML)
