@@ -51,7 +51,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☑ Seeding / reproducibility test
 - ☑ Persistence models + repository (SQLAlchemy/SQLite) + tests
 - ☑ FastAPI endpoints (registry listing)
-- ☐ FastAPI endpoints (create/run/get experiment)
+- ☑ FastAPI endpoints (create/run/get experiment)
 - ☐ Streamlit app skeleton (dropdowns from API)
 - ☐ Streamlit: parameter forms from schemas
 - ☐ Streamlit: results + Plotly charts
