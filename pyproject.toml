@@ -15,6 +15,7 @@ rl = ["stable-baselines3"]
 api = ["fastapi", "uvicorn"]
 frontend = ["streamlit", "plotly", "httpx"]
 tracking = ["mlflow"]
+physics = ["pybullet"]  # ADR 0020: optional; wheels only for Linux CPython 3.11, else a C++ build
 dev = [
     "pytest", "ruff", "mypy", "import-linter", "pre-commit", "httpx",
     "stable-baselines3", "fastapi", "uvicorn", "streamlit", "plotly", "mlflow",
