@@ -24,6 +24,21 @@ Notes:
   with `RCL_DB_URL` and `RCL_ARTIFACTS`; point the dashboard elsewhere with `RCL_API_URL`.
 - API reference: `docs/architecture/api.md`; interactive docs at `http://localhost:8000/docs`.
 
+## Benchmark in one command
+
+```bash
+python -m rcl.benchmark --envs cartpole --controllers pid lqr ppo sac --seeds 5 --episodes 5     --timesteps 20000 --out report/
+```
+
+Runs every compatible (environment, controller) pair for seeds 0..4 under one fairness protocol
+(same seeds, episodes, training budget and environment definition for every controller) and writes
+`report/report.md`, `report/report.html`, `report/summary.csv` and `report/plots/*.svg`: means with
+95% intervals across seeds, per metric. The same seeds reproduce the same files byte for byte (CPU,
+same library versions). Omit `--envs` / `--controllers` to use everything registered; pass `--spec
+spec.json` for per-controller parameters. The dashboard's **Benchmark** page does the same
+interactively. Optional: `--mlflow-uri` (or `RCL_MLFLOW_URI` for the API) logs training curves and
+checkpoints to MLflow.
+
 ## Add a robot or controller (one file)
 
 Drop a module into `rcl/environments/` (or `rcl/controllers/`) with a registry decorator:
