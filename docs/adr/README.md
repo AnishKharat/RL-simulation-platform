@@ -21,3 +21,4 @@ supersede with a new ADR instead. "Proposed" means not yet settled in architectu
 | 0014 | Declared compatibility | Accepted |
 | 0015 | Training env factory and checkpoint directory | Accepted |
 | 0016 | API surface | Accepted |
+| 0017 | Reject non-finite parameters at the registry | Accepted |

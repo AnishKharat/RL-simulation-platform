@@ -44,6 +44,8 @@ forms from `params_schema` with no per-robot code. `Registry.entries(kind)` list
 
 **Supported params subset (checked at register time):** every field of a params model must be a scalar (`str`, `int`, `float`, `bool`), an `Enum`/`Literal`, an optional (`X | None`) of those, or a tuple/list of numbers or strings (use `Field(ge=, le=, ...)` constraints; they reach the JSON schema and become form limits). Nested models, dicts, lists of objects and nested arrays raise `RegistryError` at decoration: the frontend renders forms from the schema and has no generic object editor, so the subset is what keeps "no per-robot frontend code" true.
 
+**Finite numbers (ADR 0017):** `validate_params` also rejects NaN/inf anywhere in the resolved params (`type: "finite_number"`).
+
 **Param errors:** `Entry.validate_params` wraps pydantic's `ValidationError` into `ParamValidationError` (a `RegistryError` and `ValueError`) whose `.errors` is a JSON-safe list of `{loc, msg, type}` (`loc` a list of field path parts), which the API returns as its 422 body, so the frontend can mark the offending fields.
 
 **Single source of truth for parameters:** `EnvMetadata` and `ControllerMetadata` carry no `params_schema` / `default_params`. The JSON schema and defaults come only from the Pydantic params model passed to the decorator.
