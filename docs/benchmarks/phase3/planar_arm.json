@@ -1,8 +1,12 @@
 {
-  "name": "phase3-planar-arm",
+  "name": "phase3-planar-arm-30k",
   "environments": [{"id": "planar_arm"}],
-  "controllers": [{"id": "ppo"}, {"id": "sac"}],
+  "controllers": [
+    {"id": "ppo"},
+    {"id": "sac", "params": {"buffer_size": 30000}},
+    {"id": "td3", "params": {"buffer_size": 30000}}
+  ],
   "seeds": [0, 1, 2, 3, 4],
   "episodes": 5,
-  "training": {"total_timesteps": 10000}
+  "training": {"total_timesteps": 30000}
 }
