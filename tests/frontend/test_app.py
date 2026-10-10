@@ -42,6 +42,7 @@ def test_run_from_the_form_reaches_done(api):
     at.button[0].click().run()
     assert not at.exception
     assert any("done" in s.value for s in at.success)
+    assert "Trajectory" in [h.value for h in at.subheader] and len(at.dataframe) >= 2
     run_id = at.session_state["run_id"]
     body = api.get(f"/runs/{run_id}").json()
     assert body["status"] == "done" and len(body["episodes"]) == 2

@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 import streamlit as st
 
-from rcl.frontend import client, forms
+from rcl.frontend import client, forms, plots
 
 NO_ERRORS: dict[str, dict[str, str]] = {"environment": {}, "controller": {}}
 
@@ -95,6 +95,20 @@ def watch(run_id: str) -> dict[str, Any]:
         time.sleep(0.5)
 
 
+def show_results(run: dict[str, Any]) -> None:
+    """Metric tables, learning curve (if any) and the trajectory plot of a chosen episode."""
+    st.subheader("Metrics (mean over episodes)")
+    st.dataframe(plots.run_metrics_table(run), hide_index=True)
+    with st.expander("Per-episode results"):
+        st.dataframe(plots.episode_table(run), hide_index=True)
+    if run["train_curve"]:
+        st.subheader("Training curve")
+        st.plotly_chart(plots.curve_figure(run["train_curve"]))
+    st.subheader("Trajectory")
+    episode = st.selectbox("Episode", [e["index"] for e in run["episodes"]], key="episode")
+    st.plotly_chart(plots.trajectory_figure(client.trajectory(run["run_id"], episode)))
+
+
 def main() -> None:
     st.set_page_config(page_title="Robotics Control Lab", layout="wide")
     st.title("Robotics Control Lab")
@@ -116,6 +130,7 @@ def main() -> None:
             st.error(f"Run failed in stage {run['error']['stage']}: {run['error']['message']}")
         else:
             st.success(f"Run {run_id} done")
+            show_results(run)
 
 
 if __name__ == "__main__":  # streamlit and AppTest execute the script as __main__
