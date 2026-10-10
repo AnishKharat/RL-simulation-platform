@@ -9,7 +9,7 @@ def test_lists_are_sorted_and_carry_forms_and_labels(client):
         "cartpole_discrete",
         "inverted_pendulum",
     ]
-    assert ids(client.get("/controllers")) == ["lqr", "pid", "ppo"]
+    assert ids(client.get("/controllers")) == ["lqr", "pid", "ppo", "sac"]
     env = client.get("/environments").json()[0]
     assert env["kind"] == "environment" and env["metadata"]["state_labels"]
     assert env["params_schema"]["properties"]["force_mag"]["default"] == 10.0
@@ -22,6 +22,7 @@ def test_compatible_controllers(client):
         "lqr",
         "pid",
         "ppo",
+        "sac",
     ]
     assert ids(client.get("/controllers/compatible", params={"env_id": "cartpole_discrete"})) == [
         "ppo"

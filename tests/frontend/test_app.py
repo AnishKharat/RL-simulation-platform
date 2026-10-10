@@ -30,7 +30,7 @@ def test_dropdowns_are_filled_from_the_api(api):
         "Inverted Pendulum",
     ]
     assert at.selectbox(key="env").value == "cartpole"
-    assert at.selectbox(key="ctl-cartpole").options == ["LQR", "PID", "PPO"]
+    assert at.selectbox(key="ctl-cartpole").options == ["LQR", "PID", "PPO", "SAC"]
     at.selectbox(key="env").select("cartpole_discrete").run()
     assert at.selectbox(key="ctl-cartpole_discrete").options == ["PPO"]
 
