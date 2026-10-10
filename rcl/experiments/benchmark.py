@@ -98,15 +98,23 @@ def plan(
     pairs: list[tuple[ComponentConfig, ComponentConfig]] = []
     skipped: list[Skipped] = []
     errors: list[dict[str, object]] = []
-    for env in spec.environments:
-        for ctl in spec.controllers:
+    for i, env in enumerate(spec.environments):
+        for j, ctl in enumerate(spec.controllers):
             try:
                 resolve_config(spec.experiment(env, ctl, spec.seeds[0]), registry)
             except ConfigError as exc:
                 if all(e["type"] == "incompatible" for e in exc.errors):
                     skipped.append(Skipped(env.id, ctl.id, exc.errors[0]["msg"]))
                     continue
-                errors += [{**e, "cell": [env.id, ctl.id]} for e in exc.errors]
+                for e in exc.errors:  # re-address the error to the benchmark body
+                    loc = list(e["loc"])
+                    if loc[0] == "environment":
+                        loc = ["environments", i, *loc[1:]]
+                    elif loc[0] == "controller":
+                        loc = ["controllers", j, *loc[1:]]
+                    item = {**e, "loc": loc, "cell": [env.id, ctl.id]}
+                    if not any(x["loc"] == loc and x["type"] == e["type"] for x in errors):
+                        errors.append(item)
                 continue
             pairs.append((env, ctl))
     if errors:
