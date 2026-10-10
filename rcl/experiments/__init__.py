@@ -1,11 +1,25 @@
 """Experiment orchestration: rollout, run execution."""
 
+from rcl.experiments.benchmark import (
+    BenchmarkResult,
+    BenchmarkSpec,
+    Cell,
+    Skipped,
+    plan,
+    run_benchmark,
+)
 from rcl.experiments.jobs import JobManager
 from rcl.experiments.manager import ConfigError, RunResult, derive_seeds, execute, resolve_config
 from rcl.experiments.rollout import rollout
 from rcl.metrics import METRIC_INFO, MetricInfo
 
 __all__ = [
+    "BenchmarkResult",
+    "BenchmarkSpec",
+    "Cell",
+    "Skipped",
+    "plan",
+    "run_benchmark",
     "METRIC_INFO",
     "JobManager",
     "MetricInfo",
