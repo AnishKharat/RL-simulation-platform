@@ -50,3 +50,23 @@ def test_by_metric_pivots_one_environment():
     assert list(table) == ["m", "k"]  # first-seen order
     assert sorted(table["m"]) == ["a", "b"] and sorted(table["k"]) == ["a"]
     assert by_metric(summarize(ROWS), "nope") == {}
+
+
+def test_paired_difference_uses_common_valid_seeds_only():
+    from rcl.analytics import paired_difference
+
+    rows = [
+        row("e", "a", 0, "m", 5.0),
+        row("e", "a", 1, "m", 7.0),
+        row("e", "a", 2, "m", 100.0),  # seed 2 missing for b -> ignored
+        row("e", "a", 3, "m", None, "undefined"),
+        row("e", "b", 0, "m", 3.0),
+        row("e", "b", 1, "m", 4.0),
+        row("e", "b", 3, "m", 1.0),
+        row("e", "c", 0, "m", 1.0),
+    ]
+    d = paired_difference(rows, "e", "m", "a", "b")
+    assert d.controller_id == "a-b" and d.n_valid == 2
+    assert d.mean == pytest.approx(2.5) and d.unit == "u"  # (5-3, 7-4)
+    none = paired_difference(rows, "e", "m", "a", "zzz")
+    assert none.n_valid == 0 and math.isnan(none.mean)

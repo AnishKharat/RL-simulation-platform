@@ -92,3 +92,52 @@ def by_metric(summary: list[SummaryRow], env_id: str) -> dict[str, dict[str, Sum
         if row.env_id == env_id:
             table.setdefault(row.metric_name, {})[row.controller_id] = row
     return table
+
+
+def paired_difference(
+    rows: list[dict[str, Any]], env_id: str, metric: str, a: str, b: str
+) -> SummaryRow:
+    """Summary of the per-seed differences ``a - b`` on one metric (same seeds, paired).
+
+    Only seeds where both controllers have a valid value are used; the interval method is the
+    metric's own. The result's ``controller_id`` is ``"a-b"``.
+    """
+
+    def per_seed(ctl: str) -> dict[int, float]:
+        return {
+            r["seed"]: r["value"]
+            for r in rows
+            if (r["env_id"], r["controller_id"], r["metric_name"]) == (env_id, ctl, metric)
+            and r["value"] is not None
+            and r["status"] != "undefined"
+        }
+
+    first, second = per_seed(a), per_seed(b)
+    unit = next((r["unit"] for r in rows if r["metric_name"] == metric), "")
+    diffs = [
+        {
+            "env_id": env_id,
+            "controller_id": f"{a}-{b}",
+            "metric_name": metric,
+            "seed": s,
+            "run_id": "",
+            "value": first[s] - second[s],
+            "unit": unit,
+            "status": "ok",
+        }
+        for s in sorted(first.keys() & second.keys())
+    ]
+    if not diffs:  # no common seed: an all-undefined group keeps n_total / NaN semantics
+        diffs = [
+            {
+                **_EMPTY,
+                "env_id": env_id,
+                "controller_id": f"{a}-{b}",
+                "metric_name": metric,
+                "unit": unit,
+            }
+        ]
+    return summarize(diffs)[0]
+
+
+_EMPTY = {"seed": 0, "run_id": "", "value": None, "status": "undefined"}
