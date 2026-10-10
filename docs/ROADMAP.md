@@ -65,7 +65,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☑ SAC wrapper + tests
 - ☑ Metrics: settling time, rise time, overshoot, steady-state error (one commit each, with tests)
 - ☑ Metrics: energy usage, control effort
-- ☐ Benchmark runner (controllers × envs × seeds) + tests
+- ☑ Benchmark runner (controllers × envs × seeds) + tests
 - ☐ Benchmark result persistence
 - ☐ Analytics: comparison tables
 - ☐ Analytics: statistical summaries / confidence intervals
