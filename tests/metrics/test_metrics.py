@@ -82,8 +82,14 @@ def test_zero_steps_raises():
         angle_error(empty, TASK)
 
 
-def test_compute_metrics_lists_phase1_names():
-    assert [m.name for m in compute_metrics(traj([0.1, 0.0]), TASK)] == ["return", "angle_error"]
+def test_compute_metrics_covers_every_catalogued_metric():
+    from rcl.metrics import METRIC_INFO
+
+    out = compute_metrics(traj([0.5, 0.1, 0.0]), TASK)
+    primary = [m.name for m in out]
+    assert primary == [i.name for i in METRIC_INFO]  # catalogue and computation never drift
+    for info, m in zip(METRIC_INFO, out, strict=True):
+        assert set(m.companions) == {c["name"] for c in info.companions}
 
 
 def test_aggregate_means_and_excludes_undefined():

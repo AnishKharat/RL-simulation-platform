@@ -63,7 +63,9 @@ def test_execute_pid_result_record_and_metrics():
     assert rec.config.environment.params["force_mag"] == 10.0  # defaults resolved
     assert rec.config_hash == rec.config.config_hash() and "env:cartpole" in rec.versions
     assert r.train is None and len(r.trajectories) == 2 == len(r.episode_metrics)
-    assert [m.name for m in r.metrics] == ["return", "angle_error"]
+    from rcl.metrics import METRIC_INFO
+
+    assert [m.name for m in r.metrics] == [i.name for i in METRIC_INFO]
 
 
 def test_same_seed_reproduces_and_seed_override_changes():
