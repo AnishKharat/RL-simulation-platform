@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import create_engine, event, inspect, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -22,6 +22,8 @@ from rcl.core.config import ExperimentConfig
 from rcl.persistence.models import (
     ArtifactRow,
     Base,
+    BenchmarkRunRow,
+    BenchmarkSuiteRow,
     EpisodeRow,
     ExperimentRow,
     MetricResultRow,
@@ -63,13 +65,26 @@ class Repository:
         self._session = sessionmaker(self._engine, expire_on_commit=False)
         self.artifact_root = Path(artifact_root)
         Base.metadata.create_all(self._engine)  # Alembic arrives in Phase 5 (ADR 0008)
+        self._add_missing_columns()
+
+    def _add_missing_columns(self) -> None:
+        """shortcut: create_all never alters tables, so a DB created by Phase 1 lacks
+        experiment.suite_id; add it in place. Replaced by Alembic migrations in Phase 5."""
+        with self._engine.begin() as c:
+            cols = {i["name"] for i in inspect(c).get_columns("experiment")}
+            if "suite_id" not in cols:
+                c.exec_driver_sql("ALTER TABLE experiment ADD COLUMN suite_id VARCHAR(32)")
 
     # --- writes -----------------------------------------------------------------------------
     def create_experiment(
-        self, config: ExperimentConfig, seed: int, derived_seeds: dict[str, int]
+        self,
+        config: ExperimentConfig,
+        seed: int,
+        derived_seeds: dict[str, int],
+        suite_id: str | None = None,
     ) -> tuple[str, str]:
         """Insert an Experiment (config verbatim, expected resolved) and one queued Run."""
-        exp_id, run_id = _id(), _id()
+        exp_id = _id()
         with self._session.begin() as s:
             s.add(
                 ExperimentRow(
@@ -80,13 +95,19 @@ class Repository:
                     config=config.model_dump(mode="json"),
                     config_hash=config.config_hash(),
                     created_at=_now(),
+                    suite_id=suite_id,
                 )
             )
-            s.flush()  # experiment row before the run that references it
+        return exp_id, self.add_run(exp_id, seed, derived_seeds)
+
+    def add_run(self, experiment_id: str, seed: int, derived_seeds: dict[str, int]) -> str:
+        """Add one queued Run (another seed) to an existing Experiment (ADR 0009)."""
+        run_id = _id()
+        with self._session.begin() as s:
             s.add(
                 RunRow(
                     id=run_id,
-                    experiment_id=exp_id,
+                    experiment_id=experiment_id,
                     status="queued",
                     progress=0.0,
                     seed=seed,
@@ -94,7 +115,7 @@ class Repository:
                     queued_at=_now(),
                 )
             )
-        return exp_id, run_id
+        return run_id
 
     def update_run(self, run_id: str, **fields: Any) -> None:
         """Set ``status`` / ``stage`` / ``progress``; stamps started_at / finished_at."""
@@ -283,3 +304,126 @@ class Repository:
                 return None
             with np.load(art.uri, allow_pickle=False) as z:
                 return {k: z[k] for k in z.files}
+
+    # --- benchmarks -------------------------------------------------------------------------
+    def create_suite(self, name: str, spec: dict[str, Any]) -> tuple[str, str]:
+        """Insert a BenchmarkSuite (spec verbatim) and one queued BenchmarkRun."""
+        suite_id, bench_id = _id(), _id()
+        with self._session.begin() as s:
+            s.add(BenchmarkSuiteRow(id=suite_id, name=name, spec=spec, created_at=_now()))
+            s.flush()
+            s.add(BenchmarkRunRow(id=bench_id, suite_id=suite_id, status="queued", progress=0.0))
+        return suite_id, bench_id
+
+    def update_benchmark_run(self, bench_id: str, **fields: Any) -> None:
+        """Set ``status`` / ``progress`` / ``error``; stamps started_at / finished_at."""
+        with self._session.begin() as s:
+            row = s.get(BenchmarkRunRow, bench_id)
+            if row is None:
+                raise KeyError(bench_id)
+            for k, v in fields.items():
+                setattr(row, k, v)
+            if fields.get("status") == "running" and row.started_at is None:
+                row.started_at = _now()
+            if fields.get("status") in ("done", "failed"):
+                row.finished_at = _now()
+
+    def get_benchmark_run(self, bench_id: str) -> dict[str, Any] | None:
+        with self._session() as s:
+            b = s.get(BenchmarkRunRow, bench_id)
+            if b is None:
+                return None
+            return {
+                "benchmark_run_id": b.id,
+                "suite_id": b.suite_id,
+                "status": b.status,
+                "progress": b.progress,
+                "error": b.error,
+                "started_at": b.started_at,
+                "finished_at": b.finished_at,
+            }
+
+    def get_suite(self, suite_id: str) -> dict[str, Any] | None:
+        """Suite definition, its benchmark runs and, per experiment (cell), the runs by seed."""
+        with self._session() as s:
+            suite = s.get(BenchmarkSuiteRow, suite_id)
+            if suite is None:
+                return None
+            exps = list(
+                s.scalars(
+                    select(ExperimentRow)
+                    .where(ExperimentRow.suite_id == suite_id)
+                    .order_by(ExperimentRow.created_at, ExperimentRow.id)
+                )
+            )
+            bench = s.scalars(select(BenchmarkRunRow).where(BenchmarkRunRow.suite_id == suite_id))
+            return {
+                "suite_id": suite.id,
+                "name": suite.name,
+                "spec": suite.spec,
+                "created_at": suite.created_at,
+                "benchmark_runs": [
+                    {"benchmark_run_id": b.id, "status": b.status, "progress": b.progress}
+                    for b in bench
+                ],
+                "experiments": [
+                    {
+                        "experiment_id": e.id,
+                        "env_id": e.env_id,
+                        "controller_id": e.controller_id,
+                        "config_hash": e.config_hash,
+                        "runs": [
+                            {"run_id": r.id, "seed": r.seed, "status": r.status}
+                            for r in s.scalars(
+                                select(RunRow)
+                                .where(RunRow.experiment_id == e.id)
+                                .order_by(RunRow.seed)
+                            )
+                        ],
+                    }
+                    for e in exps
+                ],
+            }
+
+    def list_suites(self) -> list[dict[str, Any]]:
+        with self._session() as s:
+            rows = s.scalars(
+                select(BenchmarkSuiteRow).order_by(BenchmarkSuiteRow.created_at.desc())
+            )
+            return [{"suite_id": r.id, "name": r.name, "created_at": r.created_at} for r in rows]
+
+    def suite_metric_rows(self, suite_id: str) -> list[dict[str, Any]]:
+        """Run-level metric values of every finished run in the suite, one row per
+        (env, controller, seed, metric): the input of cross-seed analytics."""
+        q = (
+            select(
+                ExperimentRow.env_id,
+                ExperimentRow.controller_id,
+                RunRow.seed,
+                RunRow.id,
+                MetricResultRow.metric_name,
+                MetricResultRow.value,
+                MetricResultRow.unit,
+                MetricResultRow.status,
+            )
+            .join(RunRow, RunRow.experiment_id == ExperimentRow.id)
+            .join(MetricResultRow, MetricResultRow.run_id == RunRow.id)
+            .where(
+                ExperimentRow.suite_id == suite_id,
+                RunRow.status == "done",
+                MetricResultRow.episode_id.is_(None),
+            )
+            .order_by(ExperimentRow.env_id, ExperimentRow.controller_id, RunRow.seed)
+        )
+        keys = (
+            "env_id",
+            "controller_id",
+            "seed",
+            "run_id",
+            "metric_name",
+            "value",
+            "unit",
+            "status",
+        )
+        with self._session() as s:
+            return [dict(zip(keys, row, strict=True)) for row in s.execute(q)]
