@@ -37,6 +37,7 @@ class MetricInfo(BaseModel):
     description: str
     unit: str | None
     higher_is_better: bool
+    ci_method: Literal["t", "bootstrap"] = "t"  # interval across seeds (DEFINITIONS.md)
     companions: list[dict[str, str | None]] = Field(default_factory=list)
 
 

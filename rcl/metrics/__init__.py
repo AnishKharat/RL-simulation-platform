@@ -30,6 +30,7 @@ METRIC_INFO.extend(
             description="Time until the error stays within 2% of the step size (censored: T_max).",
             unit="s",
             higher_is_better=False,
+            ci_method="bootstrap",
             companions=[{"name": "settled", "unit": "bool"}],
         ),
         MetricInfo(
@@ -37,6 +38,7 @@ METRIC_INFO.extend(
             description="Time from 10% to 90% of the commanded step.",
             unit="s",
             higher_is_better=False,
+            ci_method="bootstrap",
         ),
         MetricInfo(
             name="overshoot",

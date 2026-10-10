@@ -13,6 +13,9 @@ from typing import Any
 
 import numpy as np
 
+from rcl.analytics.stats import bootstrap_interval, t_interval
+from rcl.metrics import METRIC_INFO
+
 
 @dataclass(frozen=True)
 class SummaryRow:
@@ -31,6 +34,15 @@ class SummaryRow:
     n_censored: int
     mean: float
     std: float  # sample standard deviation (ddof = 1); NaN if n_valid < 2
+    ci_low: float  # 95% interval of the mean across seeds; NaN if n_valid < 2
+    ci_high: float
+    ci_method: str  # "t" or "bootstrap"
+    low_n: bool  # n_valid < 5: no significance claim should be made
+
+
+def ci_method_of(metric: str) -> str:
+    """Interval method for a metric from the catalogue (companions and unknown names: t)."""
+    return next((i.ci_method for i in METRIC_INFO if i.name == metric), "t")
 
 
 def summarize(rows: list[dict[str, Any]]) -> list[SummaryRow]:
@@ -47,6 +59,9 @@ def summarize(rows: list[dict[str, Any]]) -> list[SummaryRow]:
         valid = np.array(
             [r["value"] for r in g if r["value"] is not None and r["status"] != "undefined"]
         )
+        method = ci_method_of(metric)
+        values = [float(v) for v in valid]
+        low, high = bootstrap_interval(values) if method == "bootstrap" else t_interval(values)
         out.append(
             SummaryRow(
                 env_id=env_id,
@@ -60,6 +75,10 @@ def summarize(rows: list[dict[str, Any]]) -> list[SummaryRow]:
                 ),
                 mean=float(valid.mean()) if len(valid) else math.nan,
                 std=float(valid.std(ddof=1)) if len(valid) > 1 else math.nan,
+                ci_low=low,
+                ci_high=high,
+                ci_method=method,
+                low_n=len(valid) < 5,
             )
         )
     return out
