@@ -115,22 +115,21 @@ def main() -> None:
     try:
         with st.sidebar:
             config = sidebar()
+        if config is not None:
+            submit(config)
+            st.rerun()  # redraw the sidebar so server-side field errors show next to widgets
+        for msg in st.session_state.pop("general_errors", []):
+            st.error(msg)
+        run_id = st.session_state.get("run_id")
+        if run_id:
+            run = watch(run_id)
+            if run["status"] == "failed":
+                st.error(f"Run failed in stage {run['error']['stage']}: {run['error']['message']}")
+            else:
+                st.success(f"Run {run_id} done")
+                show_results(run)
     except httpx.HTTPError as exc:
-        st.error(f"Cannot reach the API: {exc}")
-        return
-    if config is not None:
-        submit(config)
-        st.rerun()  # redraw the sidebar so server-side field errors show next to their widgets
-    for msg in st.session_state.pop("general_errors", []):
-        st.error(msg)
-    run_id = st.session_state.get("run_id")
-    if run_id:
-        run = watch(run_id)
-        if run["status"] == "failed":
-            st.error(f"Run failed in stage {run['error']['stage']}: {run['error']['message']}")
-        else:
-            st.success(f"Run {run_id} done")
-            show_results(run)
+        st.error(f"API error: {exc}")
 
 
 if __name__ == "__main__":  # streamlit and AppTest execute the script as __main__

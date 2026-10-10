@@ -100,3 +100,9 @@ def test_failed_run_is_200_with_error_and_trajectory_409(client):
     run = resp.json()
     assert run["status"] == "failed" and run["error"]["type"] == "ConfigError"
     assert client.get(f"/runs/{run_id}/trajectory/0").status_code == 409
+
+
+def test_controller_config_error_is_422_not_a_failed_run(client):
+    r = post(client, controller={"id": "pid", "params": {"obs_index": 99}})
+    assert r.status_code == 422
+    assert r.json()["detail"][0]["loc"] == ["body", "controller", "params"]
