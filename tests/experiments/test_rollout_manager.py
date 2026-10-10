@@ -120,3 +120,11 @@ def test_execute_ppo_trains_reports_and_checkpoints(tmp_path):
     again = execute(config)
     assert again.metrics == r.metrics  # trained policy + evaluation reproduce for the same seed
     assert again.record.versions["device"] == "cpu"
+
+
+def test_versions_record_the_simulator_when_installed():
+    pytest.importorskip("pybullet")
+    import importlib.metadata
+
+    r = execute(cfg())
+    assert r.record.versions["pybullet"] == importlib.metadata.version("pybullet")
