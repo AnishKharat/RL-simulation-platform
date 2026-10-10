@@ -8,6 +8,7 @@ The default registry is the single piece of global state in the project.
 from __future__ import annotations
 
 import importlib
+import math
 import pkgutil
 import re
 from collections.abc import Callable, Collection, Iterator
@@ -84,7 +85,7 @@ class Entry:
                 )
             return {}
         try:
-            return self.params_model(**(raw or {})).model_dump(mode="json")
+            resolved = self.params_model(**(raw or {})).model_dump(mode="json")
         except ValidationError as exc:
             found: list[dict[str, Any]] = [
                 {"loc": list(e["loc"]), "msg": e["msg"], "type": e["type"]}
@@ -93,6 +94,26 @@ class Entry:
             raise ParamValidationError(
                 f"invalid params for {self.kind} {self.id!r}: {len(found)} error(s)", found
             ) from exc
+        bad = [
+            {"loc": loc, "msg": "must be a finite number", "type": "finite_number"}
+            for loc in _non_finite(resolved, [])
+        ]
+        if bad:  # ADR 0017: NaN/inf would be stored, hashed and run silently
+            raise ParamValidationError(
+                f"invalid params for {self.kind} {self.id!r}: {len(bad)} error(s)", bad
+            )
+        return resolved
+
+
+def _non_finite(value: Any, loc: list[str | int]) -> list[list[str | int]]:
+    """Paths of NaN/inf floats inside resolved (JSON-mode) params, nested lists included."""
+    if isinstance(value, float):
+        return [] if math.isfinite(value) else [loc]
+    if isinstance(value, dict):
+        return [p for k, v in value.items() for p in _non_finite(v, [*loc, k])]
+    if isinstance(value, list):
+        return [p for i, v in enumerate(value) for p in _non_finite(v, [*loc, i])]
+    return []
 
 
 class Registry:

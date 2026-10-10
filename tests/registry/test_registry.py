@@ -393,3 +393,16 @@ def test_param_subset_rejects_nested_objects_and_refs(reg: Registry, model: type
     with pytest.raises(RegistryError, match="supported subset"):
         register_controller("bad", params=model)(_ctl_cls())
     assert reg.entries("controller") == []
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_non_finite_params_are_rejected_with_loc(reg: Registry, bad: float) -> None:
+    register_controller("pid", params=Params)(_ctl_cls())
+    entry = reg.get("controller", "pid")
+    with pytest.raises(ParamValidationError) as exc:
+        entry.validate_params({"kp": bad, "gains": [1.0, bad]})
+    assert {(tuple(e["loc"]), e["type"]) for e in exc.value.errors} == {
+        (("kp",), "finite_number"),
+        (("gains", 1), "finite_number"),
+    }
+    assert entry.validate_params({"kp": 1e300})["kp"] == 1e300  # large but finite is fine

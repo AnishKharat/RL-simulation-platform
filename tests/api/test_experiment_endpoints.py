@@ -106,3 +106,18 @@ def test_controller_config_error_is_422_not_a_failed_run(client):
     r = post(client, controller={"id": "pid", "params": {"obs_index": 99}})
     assert r.status_code == 422
     assert r.json()["detail"][0]["loc"] == ["body", "controller", "params"]
+
+
+def test_nan_and_inf_params_are_422_not_a_done_run(client):
+    for token in ("NaN", "Infinity"):
+        body = (
+            '{"name": "n", "seed": 1, "environment": {"id": "cartpole"},'
+            ' "controller": {"id": "pid", "params": {"kp": ' + token + "}},"
+            ' "evaluation": {"episodes": 1}}'
+        )
+        r = client.post("/experiments", content=body, headers={"content-type": "application/json"})
+        assert r.status_code == 422
+        err = r.json()["detail"][0]
+        assert (
+            err["loc"] == ["body", "controller", "params", "kp"] and err["type"] == "finite_number"
+        )
