@@ -16,7 +16,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 from rcl.core.environment import BaseEnvironment
-from rcl.core.types import ActionSpaceKind, EnvMetadata, EnvSpec, TaskSpec
+from rcl.core.types import ActionSpaceKind, EnvMetadata, EnvSpec, LinearModel, TaskSpec
 from rcl.registry import register_environment
 
 THETA_LIMIT = 0.8  # rad; beyond this the pendulum counts as fallen
@@ -42,6 +42,7 @@ class InvertedPendulum(BaseEnvironment):
         dof=1,
         action_space_kind=ActionSpaceKind.CONTINUOUS,
         physics_backend="analytic",
+        linearizable=True,
         state_labels=("theta", "theta_dot"),
         state_units=("rad", "rad/s"),
         action_labels=("torque",),
@@ -84,19 +85,32 @@ class InvertedPendulum(BaseEnvironment):
                 self.max_torque,
             )
         )
+        self._state = self._next(self._state, u)
         th, thd = self._state
-        inertia = self.m * self.l**2
-        thd = thd + self.dt * (
-            (self.m * self.g * self.l * math.sin(th) + u - self.b * thd) / inertia
-        )
-        th = th + self.dt * thd
-        self._state = np.array([th, thd])
         self._t += 1
         cost = (th / THETA_LIMIT) ** 2 + 0.01 * thd**2 + 0.001 * u**2
         terminated = bool(abs(th) > THETA_LIMIT)
         truncated = bool(not terminated and self._t >= self.max_steps)
         info = {"applied_action": np.array([u])}
         return self._state.copy(), 1.0 - cost, terminated, truncated, info
+
+    def _next(self, s: np.ndarray, u: float) -> np.ndarray:
+        """One semi-implicit Euler step (pure; also the linearization source)."""
+        th, thd = s
+        inertia = self.m * self.l**2
+        thd = thd + self.dt * (
+            (self.m * self.g * self.l * math.sin(th) + u - self.b * thd) / inertia
+        )
+        return np.array([th + self.dt * thd, thd])
+
+    def get_linearization(self) -> LinearModel | None:
+        """Jacobians of the step map at the upright equilibrium (central differences)."""
+        eps, z0 = 1e-6, np.zeros(2)
+        a_cols = [
+            (self._next(eps * e, 0.0) - self._next(-eps * e, 0.0)) / (2 * eps) for e in np.eye(2)
+        ]
+        b = (self._next(z0, eps) - self._next(z0, -eps)) / (2 * eps)
+        return LinearModel(np.stack(a_cols, axis=1), b.reshape(2, 1), z0, np.zeros(1), self.dt)
 
     def get_state(self) -> np.ndarray:
         return self._state.copy()

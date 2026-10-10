@@ -16,7 +16,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 from rcl.core.environment import BaseEnvironment
-from rcl.core.types import ActionSpaceKind, EnvMetadata, EnvSpec, TaskSpec
+from rcl.core.types import ActionSpaceKind, EnvMetadata, EnvSpec, LinearModel, TaskSpec
 from rcl.registry import register_environment
 
 THETA_LIMIT = 12 * math.pi / 180  # pole counts as fallen beyond 12 degrees
@@ -46,6 +46,7 @@ class CartPole(BaseEnvironment):
         dof=2,
         action_space_kind=ActionSpaceKind.CONTINUOUS,
         physics_backend="analytic",
+        linearizable=True,
         action_labels=("force",),
         action_units=("N",),
         **_LABELS,
@@ -92,20 +93,33 @@ class CartPole(BaseEnvironment):
 
     def step(self, action: Any) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         force = self._force(action)
-        x, xd, th, thd = self._state
-        total, pml = self.mc + self.mp, self.mp * self.l
-        sin, cos = math.sin(th), math.cos(th)
-        temp = (force + pml * thd**2 * sin) / total
-        thacc = (self.g * sin - cos * temp) / (self.l * (4.0 / 3.0 - self.mp * cos**2 / total))
-        xacc = temp - pml * thacc * cos / total
-        self._state = np.array(
-            [x + self.dt * xd, xd + self.dt * xacc, th + self.dt * thd, thd + self.dt * thacc]
-        )
+        self._state = self._next(self._state, force)
         self._t += 1
         terminated = bool(abs(self._state[0]) > X_LIMIT or abs(self._state[2]) > THETA_LIMIT)
         truncated = bool(not terminated and self._t >= self.max_steps)
         info = {"applied_action": np.asarray(self._applied(force), dtype=np.float64)}
         return self._state.copy(), 1.0, terminated, truncated, info
+
+    def _next(self, s: np.ndarray, force: float) -> np.ndarray:
+        """One Euler step of the cart-pole dynamics (pure; also the linearization source)."""
+        x, xd, th, thd = s
+        total, pml = self.mc + self.mp, self.mp * self.l
+        sin, cos = math.sin(th), math.cos(th)
+        temp = (force + pml * thd**2 * sin) / total
+        thacc = (self.g * sin - cos * temp) / (self.l * (4.0 / 3.0 - self.mp * cos**2 / total))
+        xacc = temp - pml * thacc * cos / total
+        return np.array(
+            [x + self.dt * xd, xd + self.dt * xacc, th + self.dt * thd, thd + self.dt * thacc]
+        )
+
+    def get_linearization(self) -> LinearModel | None:
+        """Jacobians of the step map at the upright equilibrium (central differences)."""
+        eps, z0 = 1e-6, np.zeros(4)
+        a_cols = [
+            (self._next(eps * e, 0.0) - self._next(-eps * e, 0.0)) / (2 * eps) for e in np.eye(4)
+        ]
+        b = (self._next(z0, eps) - self._next(z0, -eps)) / (2 * eps)
+        return LinearModel(np.stack(a_cols, axis=1), b.reshape(4, 1), z0, np.zeros(1), self.dt)
 
     def _applied(self, force: float) -> Any:
         return [force]
@@ -166,6 +180,9 @@ class CartPoleDiscrete(CartPole):
 
     def _force(self, action: Any) -> float:
         return self.force_mag if int(action) == 1 else -self.force_mag
+
+    def get_linearization(self) -> LinearModel | None:
+        return None  # discrete push: no linear input matrix
 
     def _applied(self, force: float) -> Any:
         return force  # scalar -> shape () = EnvSpec.action_shape for discrete

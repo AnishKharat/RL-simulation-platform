@@ -19,8 +19,8 @@ def test_shapes_spec_and_labels(env_id, cls, action):
     spec, meta = env.get_env_spec(), cls.env_metadata
     assert spec.env_id == env_id and obs.shape == spec.obs_shape
     assert len(meta.state_labels) == spec.state_dim == env.get_state().shape[0]
-    assert (spec.action_space_kind == meta.action_space_kind) and env.get_linearization() is None
-    assert not meta.linearizable
+    assert spec.action_space_kind == meta.action_space_kind
+    assert (env.get_linearization() is not None) == meta.linearizable  # ADR 0014 agreement
     obs, r, term, trunc, info = env.step(action)
     assert obs.shape == spec.obs_shape and isinstance(r, float) and not (term and trunc)
     assert info["applied_action"].shape == spec.action_shape
@@ -57,3 +57,19 @@ def test_discrete_action_mapping():
     env = CartPoleDiscrete(force_mag=7.0)
     env.reset(seed=0)
     assert env.step(0)[4]["applied_action"] == -7.0 and env.step(1)[4]["applied_action"] == 7.0
+
+
+@pytest.mark.parametrize("cls", [CartPole, InvertedPendulum])
+def test_linearization_matches_step_near_equilibrium(cls):
+    env = cls()
+    lin = env.get_linearization()
+    n = lin.A.shape[0]
+    assert lin.B.shape == (n, 1) and lin.dt == env.dt and not lin.x_eq.any() and not lin.u_eq.any()
+    rng = np.random.default_rng(0)
+    z, u = 1e-4 * rng.standard_normal(n), 1e-3
+    assert np.allclose(env._next(z, u), lin.A @ z + lin.B[:, 0] * u, atol=1e-9)
+
+
+def test_discrete_cartpole_has_no_linearization():
+    assert CartPoleDiscrete().get_linearization() is None
+    assert not CartPoleDiscrete.env_metadata.linearizable
