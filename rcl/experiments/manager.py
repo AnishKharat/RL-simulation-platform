@@ -14,15 +14,22 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
 from rcl.core.config import ExperimentConfig, RunRecord
 from rcl.core.environment import BaseEnvironment
-from rcl.core.types import EpisodeTrajectory, TrainConfig, TrainResult
+from rcl.core.types import EpisodeTrajectory, TaskSpec, TrainConfig, TrainResult
 from rcl.experiments.rollout import rollout
 from rcl.metrics import MetricValue, aggregate, compute_metrics
-from rcl.registry import Entry, Registry, get_registry
+from rcl.registry import (
+    Entry,
+    ParamValidationError,
+    Registry,
+    UnknownIdError,
+    get_registry,
+)
 
 log = logging.getLogger(__name__)
 _LIBS = ("numpy", "gymnasium", "pydantic", "stable-baselines3", "torch", "rcl")
@@ -38,6 +45,60 @@ class RunResult:
     trajectories: list[EpisodeTrajectory]
     episode_metrics: list[list[MetricValue]]
     metrics: list[MetricValue]
+    task: TaskSpec
+
+
+class ConfigError(ValueError):
+    """Config rejected before any work starts. ``errors`` is a JSON-safe list of
+    ``{loc, msg, type}`` with ``loc`` relative to the config (the API adds its body prefix)."""
+
+    def __init__(self, errors: list[dict[str, Any]]) -> None:
+        super().__init__("; ".join(str(e["msg"]) for e in errors))
+        self.errors = errors
+
+
+def _err(loc: list[str | int], msg: str, type_: str) -> dict[str, Any]:
+    return {"loc": loc, "msg": msg, "type": type_}
+
+
+def resolve_config(
+    config: ExperimentConfig, registry: Registry
+) -> tuple[ExperimentConfig, Entry, Entry]:
+    """Validate ``config`` against the registry and return it with RESOLVED params (defaults
+    filled) plus the environment and controller entries. Raises :class:`ConfigError` listing
+    every problem: unknown ids, invalid params, incompatible pair, missing training section,
+    unsupported perturbations, training on a non-simulated environment."""
+    errors: list[dict[str, Any]] = []
+    entries: dict[str, Entry] = {}
+    resolved: dict[str, Any] = {}
+    for kind, comp in (("environment", config.environment), ("controller", config.controller)):
+        try:
+            entry = registry.get(kind, comp.id)  # type: ignore[arg-type]
+        except UnknownIdError as exc:
+            errors.append(_err([kind, "id"], str(exc.args[0]), "unknown_id"))
+            continue
+        entries[kind] = entry
+        try:
+            resolved[kind] = comp.model_copy(update={"params": entry.validate_params(comp.params)})
+        except ParamValidationError as exc:
+            errors += [_err([kind, "params", *e["loc"]], e["msg"], e["type"]) for e in exc.errors]
+    if config.perturbations:
+        errors.append(_err(["perturbations"], "not supported before Phase 4", "unsupported"))
+    if len(entries) == 2:
+        env_e, ctl_e = entries["environment"], entries["controller"]
+        if not registry.is_compatible(ctl_e.id, env_e.id):
+            msg = f"controller {ctl_e.id!r} is not compatible with environment {env_e.id!r}"
+            errors.append(_err(["controller", "id"], msg, "incompatible"))
+        if ctl_e.metadata.requires_training:
+            if config.training is None:
+                msg = f"controller {ctl_e.id!r} requires a training section"
+                errors.append(_err(["training"], msg, "missing"))
+            if not env_e.metadata.simulated:
+                msg = "training on a non-simulated environment is not allowed"
+                errors.append(_err(["controller", "id"], msg, "not_trainable"))
+    if errors:
+        raise ConfigError(errors)
+    return config.model_copy(update=resolved), entries["environment"], entries["controller"]
 
 
 def derive_seeds(seed: int) -> dict[str, int]:
@@ -92,33 +153,16 @@ def execute(
 ) -> RunResult:
     """Run one experiment end to end.
 
-    ``seed`` overrides ``config.seed`` for this run. Raises ``UnknownIdError`` /
-    ``ParamValidationError`` (registry) or ``ValueError`` (incompatible pair, missing
-    training section, unsupported perturbations) before any work starts. ``on_stage`` is
+    ``seed`` overrides ``config.seed`` for this run. Raises ``ConfigError`` (see
+    :func:`resolve_config`) before any work starts. ``on_stage`` is
     called with ``"training"`` / ``"evaluating"``; ``progress`` is forwarded to training.
     If ``checkpoint_dir`` is given a trained controller is saved there.
     """
     reg = registry or get_registry()
-    env_entry = reg.get("environment", config.environment.id)
-    ctl_entry = reg.get("controller", config.controller.id)
-    if not reg.is_compatible(ctl_entry.id, env_entry.id):
-        raise ValueError(f"controller {ctl_entry.id!r} is not compatible with {env_entry.id!r}")
-    if config.perturbations:
-        raise ValueError("perturbations are not supported before Phase 4")
+    resolved, env_entry, ctl_entry = resolve_config(config, reg)
+    env_params = resolved.environment.params
+    ctl_params = resolved.controller.params
     needs_training = ctl_entry.metadata.requires_training
-    if needs_training and config.training is None:
-        raise ValueError(f"controller {ctl_entry.id!r} requires a 'training' section")
-    if needs_training and not env_entry.metadata.simulated:
-        raise ValueError("training on a non-simulated environment is not allowed")
-
-    env_params = env_entry.validate_params(config.environment.params)
-    ctl_params = ctl_entry.validate_params(config.controller.params)
-    resolved = config.model_copy(
-        update={
-            "environment": config.environment.model_copy(update={"params": env_params}),
-            "controller": config.controller.model_copy(update={"params": ctl_params}),
-        }
-    )
     run_seed = config.seed if seed is None else seed
     seeds = derive_seeds(run_seed)
     record = RunRecord(
@@ -159,5 +203,5 @@ def execute(
     episode_metrics = [compute_metrics(t, task) for t in trajectories]
     log.info("run done: %s on %s seed=%d", ctl_entry.id, env_entry.id, run_seed)
     return RunResult(
-        record, train_result, trajectories, episode_metrics, aggregate(episode_metrics)
+        record, train_result, trajectories, episode_metrics, aggregate(episode_metrics), task
     )

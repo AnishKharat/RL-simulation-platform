@@ -28,6 +28,18 @@ class MetricValue(BaseModel):
     companions: dict[str, tuple[float, str]] = Field(default_factory=dict)
 
 
+class MetricInfo(BaseModel):
+    """Catalogue entry served by ``GET /metrics``. ``unit`` None = the task's output unit."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    description: str
+    unit: str | None
+    higher_is_better: bool
+    companions: list[dict[str, str | None]] = Field(default_factory=list)
+
+
 def _check(traj: EpisodeTrajectory) -> bool:
     """Raise on T = 0 (programming error); return False if any array is non-finite."""
     if traj.n_steps == 0:
@@ -114,3 +126,20 @@ def aggregate(per_episode: list[list[MetricValue]]) -> list[MetricValue]:
             )
         )
     return out
+
+
+METRIC_INFO: list[MetricInfo] = [
+    MetricInfo(
+        name="return",
+        description="Undiscounted sum of rewards over the episode.",
+        unit="reward",
+        higher_is_better=True,
+    ),
+    MetricInfo(
+        name="angle_error",
+        description="RMS distance of the controlled output from its reference.",
+        unit=None,
+        higher_is_better=False,
+        companions=[{"name": "max_abs_angle_error", "unit": None}],
+    ),
+]
