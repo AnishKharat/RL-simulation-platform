@@ -84,3 +84,16 @@ def test_zero_steps_raises():
 
 def test_compute_metrics_lists_phase1_names():
     assert [m.name for m in compute_metrics(traj([0.1, 0.0]), TASK)] == ["return", "angle_error"]
+
+
+def test_aggregate_means_and_excludes_undefined():
+    from rcl.metrics import aggregate
+
+    eps = [compute_metrics(traj(th), TASK) for th in ([0.3, 0.0], [0.1, 0.0], [0.1, np.nan])]
+    agg = {m.name: m for m in aggregate(eps)}
+    assert agg["return"].value == pytest.approx(1.0) and agg["return"].status == "ok"
+    e = [angle_error(traj(th), TASK) for th in ([0.3, 0.0], [0.1, 0.0])]
+    assert agg["angle_error"].value == pytest.approx(np.mean([x.value for x in e]))
+    assert agg["angle_error"].companions["max_abs_angle_error"][0] == pytest.approx(0.2)
+    allbad = aggregate([compute_metrics(traj([0.1, np.nan]), TASK)])
+    assert all(m.status == "undefined" for m in allbad)

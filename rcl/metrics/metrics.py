@@ -53,7 +53,7 @@ def episode_return(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
     return MetricValue(name="return", value=float(traj.rewards.sum()), unit="reward")
 
 
-def _wrap(d: np.ndarray) -> np.ndarray:
+def wrap_angle(d: np.ndarray) -> np.ndarray:
     """Map angles to (-pi, pi]."""
     return np.pi - ((np.pi - d) % (2 * np.pi))
 
@@ -66,7 +66,7 @@ def angle_error(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
     idx = list(task.error_state_indices)
     d = traj.states[:, idx] - np.asarray(task.y_ref)
     wrapped = [i for i, s in enumerate(idx) if s in task.wrap_indices]
-    d[:, wrapped] = _wrap(d[:, wrapped])
+    d[:, wrapped] = wrap_angle(d[:, wrapped])
     e = np.linalg.norm(d, axis=1)
     return MetricValue(
         name="angle_error",
@@ -86,3 +86,31 @@ METRICS: dict[str, Callable[[EpisodeTrajectory, TaskSpec], MetricValue]] = {
 def compute_metrics(traj: EpisodeTrajectory, task: TaskSpec) -> list[MetricValue]:
     """All Phase 1 metrics for one episode."""
     return [fn(traj, task) for fn in METRICS.values()]
+
+
+def aggregate(per_episode: list[list[MetricValue]]) -> list[MetricValue]:
+    """Per-run value: mean of each metric (and companion) over the evaluation episodes.
+
+    ``undefined`` episodes are excluded; the result is ``undefined`` if none is valid and
+    ``censored`` if any included episode is (DEFINITIONS.md, "Aggregation across seeds").
+    """
+    out: list[MetricValue] = []
+    for k in range(len(per_episode[0])):
+        ms = [ep[k] for ep in per_episode if ep[k].status != "undefined"]
+        first = per_episode[0][k]
+        if not ms:
+            out.append(_undefined(first.name, first.unit, tuple(first.companions)))
+            continue
+        out.append(
+            MetricValue(
+                name=first.name,
+                value=float(np.mean([m.value for m in ms])),
+                unit=first.unit,
+                status="censored" if any(m.status == "censored" for m in ms) else "ok",
+                companions={
+                    c: (float(np.mean([m.companions[c][0] for m in ms])), u)
+                    for c, (_, u) in first.companions.items()
+                },
+            )
+        )
+    return out

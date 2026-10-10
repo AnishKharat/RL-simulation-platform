@@ -3,9 +3,19 @@
 from rcl.metrics.metrics import (
     METRICS,
     MetricValue,
+    aggregate,
     angle_error,
     compute_metrics,
     episode_return,
+    wrap_angle,
 )
 
-__all__ = ["METRICS", "MetricValue", "angle_error", "compute_metrics", "episode_return"]
+__all__ = [
+    "METRICS",
+    "MetricValue",
+    "aggregate",
+    "angle_error",
+    "compute_metrics",
+    "episode_return",
+    "wrap_angle",
+]
