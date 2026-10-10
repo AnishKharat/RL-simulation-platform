@@ -54,7 +54,9 @@ def test_summary_has_cis_counts_and_json_safe_nulls(client):
         assert r["ci_low"] <= r["mean"] <= r["ci_high"]
     assert {r["ci_method"] for r in rows if r["metric_name"] == "settling_time"} == {"bootstrap"}
     assert client.get(f"/benchmarks/{suite}/summary", params={"env_id": "nope"}).json() == []
-    assert len(client.get(f"/benchmarks/{suite}/summary").json()) >= len(rows)
+    assert len(client.get(f"/benchmarks/{suite}/summary").json()) == len(
+        rows
+    )  # skipped env has no rows
 
 
 def test_paired_difference_and_not_found(client):

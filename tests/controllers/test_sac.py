@@ -50,7 +50,7 @@ def test_progress_callback_and_cooperative_stop():
     c = SAC()
     c.configure(CartPole().get_env_spec(), PARAMS)
     res = c.train(CartPole, TrainConfig(total_timesteps=10_000, seed=0), lambda d, t: True)
-    assert res.timesteps < 10_000
+    assert res.timesteps < 100  # stops at the first opportunity, not at the budget
 
 
 def test_predict_before_train_discrete_rejected_and_registry():
@@ -62,4 +62,15 @@ def test_predict_before_train_discrete_rejected_and_registry():
     reg = get_registry()
     assert reg.is_compatible("sac", "cartpole") and not reg.is_compatible(
         "sac", "cartpole_discrete"
+    )
+
+
+def test_curve_is_thinned_to_about_200_points():
+    c = SAC()
+    c.configure(CartPole().get_env_spec(), PARAMS)
+    res = c.train(CartPole, TrainConfig(total_timesteps=600, seed=0))
+    assert 1 < len(res.curve) <= 205  # SB3 ends a rollout every step for SAC (train_freq=1)
+    steps = [s for s, _ in res.curve]
+    assert steps == sorted(steps) and all(
+        b - a >= 3 for a, b in zip(steps, steps[1:], strict=False)
     )
