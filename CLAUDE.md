@@ -14,7 +14,7 @@
 2. **One task at a time**, in the current phase only. No later-phase features early.
 3. **Respect modularity** (`project_context.md` §3–4):
    - `core/` imports nothing from the project.
-   - Environments/controllers import only `core` and `registry` (the registration decorator).
+   - Environments import only `core`, `registry` (the registration decorator) and `physics` (simulator backends, ADR 0019); controllers import only `core` and `registry`. `physics` imports only `core`.
    - Frontend talks to the API only.
    - New robot or controller = 1 file + registry decorator. If your change needs edits elsewhere, stop and raise it as an architecture issue.
 4. **No hardcoded environment/controller names** in the frontend, API or experiment manager. Use registry metadata.

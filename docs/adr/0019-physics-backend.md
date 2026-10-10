@@ -1,6 +1,6 @@
 # 0019. PhysicsBackend interface and the physics layer
 
-- Status: Proposed (architecture review 4). Interface stub applied (additive); the dependency-rule change below awaits user approval.
+- Status: Accepted (architecture review 4, user approved 2026-10-10)
 - Date: 2026-10-10
 
 ## Context
@@ -20,7 +20,7 @@ Physics. Today there is no physics package; CartPole and the pendulum integrate 
    - **Determinism:** same initial state, same torques and same step counts give the same states. The claim covers
      the same machine, library version and headless mode only.
    - **Linearisation:** `get_state`/`set_state` make finite-difference `get_linearization` possible for LQR.
-2. **Where implementations live (PROPOSED, needs approval):** a new package `rcl.physics` (e.g. `rcl/physics/pybullet.py`)
+2. **Where implementations live (approved 2026-10-10):** a new package `rcl.physics` (e.g. `rcl/physics/pybullet.py`)
    as its own layer between the plugin tier and `registry`/`core`: `environments -> physics -> core`.
    - `rcl.physics` imports only `rcl.core` (+ its simulator, lazily). Controllers, perturbations, experiments, api,
      analytics and frontend must not import it.

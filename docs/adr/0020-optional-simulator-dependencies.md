@@ -1,6 +1,6 @@
 # 0020. Optional simulator dependencies (PyBullet extra, conditional registration, CI)
 
-- Status: Proposed (architecture review 4). No frozen interface changes; tooling and convention only.
+- Status: Accepted (architecture review 4, user approved 2026-10-10)
 - Date: 2026-10-10
 
 ## Context
