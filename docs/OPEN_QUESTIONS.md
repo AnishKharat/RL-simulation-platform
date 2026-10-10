@@ -5,12 +5,19 @@
 
 ## Open
 
-- **Q:** Approve a new physics layer `rcl.physics` (PhysicsBackend implementations) between the plugin tier and core, which changes the frozen rule "environments import only `core` and `registry`" to "`core`, `registry` and `physics`" (CLAUDE.md 1.3, rcl/environments/CLAUDE.md, project_context 4, import-linter contracts)? Fallback without a rule change: backends as private modules inside `rcl/environments/`. | **Raised by:** orchestrator, review 4, 2026-10-10 | **Affects:** ADR 0019, pyproject contracts, Phase 3
-- **Q:** Robot arm model: KUKA iiwa 7-DOF from `pybullet_data` (realistic, large RL budgets) or a 2-3 DOF planar arm (fast to learn)? | **Raised by:** orchestrator, review 4, 2026-10-10 | **Affects:** docs/architecture/phase3-robots.md, Phase 3 benchmarks
-- **Q:** May a robot ship a model file (URDF) next to its single `.py` file (e.g. `rcl/environments/assets/`), or must models be built in code / come from `pybullet_data`? | **Raised by:** orchestrator, review 4, 2026-10-10 | **Affects:** "one robot = one file" rule, Phase 3
-- **Q:** Approve ADR 0020 (PyBullet as optional extra `physics`, conditional registration, separate Linux/3.11 CI job)? | **Raised by:** orchestrator, review 4, 2026-10-10 | **Affects:** pyproject, CI, discovery behaviour
-
 ## Resolved
+
+- **Q:** Approve a new physics layer `rcl.physics` (PhysicsBackend implementations) between the plugin tier and core, which changes the frozen rule "environments import only `core` and `registry`" to "`core`, `registry` and `physics`" (CLAUDE.md 1.3, rcl/environments/CLAUDE.md, project_context 4, import-linter contracts)? Fallback without a rule change: backends as private modules inside `rcl/environments/`. | **Raised by:** orchestrator, review 4, 2026-10-10 | **Affects:** ADR 0019, pyproject contracts, Phase 3
+  **Resolved 2026-10-10 (user approved):** `rcl.physics` layer, imports core only, only environments may import it; rule files, project_context 4 and import-linter contracts updated. ADR 0019 Accepted.
+
+- **Q:** Robot arm model: KUKA iiwa 7-DOF from `pybullet_data` (realistic, large RL budgets) or a 2-3 DOF planar arm (fast to learn)? | **Raised by:** orchestrator, review 4, 2026-10-10 | **Affects:** docs/architecture/phase3-robots.md, Phase 3 benchmarks
+  **Resolved 2026-10-10 (user):** a 2-3 DOF planar arm, not the KUKA iiwa. Chosen: 2-DOF arm in the horizontal plane (no gravity load, fast RL), see docs/architecture/phase3-robots.md.
+
+- **Q:** May a robot ship a model file (URDF) next to its single `.py` file (e.g. `rcl/environments/assets/`), or must models be built in code / come from `pybullet_data`? | **Raised by:** orchestrator, review 4, 2026-10-10 | **Affects:** "one robot = one file" rule, Phase 3
+  **Resolved 2026-10-10 (user):** yes, in a sibling folder `rcl/environments/assets/<robot_id>/`; the robot stays one `.py` file. Documented in project_context 3.
+
+- **Q:** Approve ADR 0020 (PyBullet as optional extra `physics`, conditional registration, separate Linux/3.11 CI job)? | **Raised by:** orchestrator, review 4, 2026-10-10 | **Affects:** pyproject, CI, discovery behaviour
+  **Resolved 2026-10-10 (user approved):** optional `physics` extra, conditional registration, Linux/CPython 3.11 CI job. PyBullet installed in the project `.venv` only. ADR 0020 Accepted.
 
 - **Q:** Param models accept NaN/inf (e.g. PID kp=NaN yields a "done" run). Fix requires a change to frozen core config validation (reject non-finite floats). Approve as an architecture change with an ADR? | **Raised by:** Phase 1 orchestrator, 2026-10-10 | **Affects:** rcl/core config, all param models
   **Resolved 2026-10-10 (user approved):** reject non-finite floats in `Entry.validate_params` (422 `finite_number`); no interface shape changed. ADR 0017.
