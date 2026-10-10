@@ -24,3 +24,4 @@ supersede with a new ADR instead. "Proposed" means not yet settled in architectu
 | 0017 | Reject non-finite parameters at the registry | Accepted |
 | 0018 | Benchmark CLI and report export | Accepted |
 | 0019 | PhysicsBackend interface and the physics layer | Proposed (review 4) |
+| 0020 | Optional simulator dependencies (extra, conditional registration, CI) | Proposed (review 4) |
