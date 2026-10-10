@@ -53,3 +53,11 @@ def test_failing_job_is_recorded_not_raised(setup):
     r = repo.get_run(run)
     assert r["status"] == "failed" and r["finished_at"]
     assert r["error"]["type"] == "ConfigError" and "does_not_exist" in r["error"]["message"]
+
+
+def test_non_finite_metrics_become_null_rows():
+    from rcl.experiments.jobs import _metric_rows
+    from rcl.metrics import MetricValue
+
+    m = MetricValue(name="x", value=math.inf, unit="u", companions={"y": (math.nan, "u")})
+    assert [r["value"] for r in _metric_rows(m, None)] == [None, None]

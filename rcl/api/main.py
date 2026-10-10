@@ -45,7 +45,7 @@ def create_app(
     artifact_root: str | None = None,
     registry: Registry | None = None,
     discovery_packages: Collection[str] = DISCOVERY_PACKAGES,
-    max_workers: int = 2,
+    max_workers: int = 1,
 ) -> FastAPI:
     """Build the app. ``registry`` / ``discovery_packages`` let tests run against an isolated
     registry; by default the process-wide registry and the standard plugin packages are used."""

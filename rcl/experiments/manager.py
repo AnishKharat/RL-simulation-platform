@@ -96,6 +96,20 @@ def resolve_config(
             if not env_e.metadata.simulated:
                 msg = "training on a non-simulated environment is not allowed"
                 errors.append(_err(["controller", "id"], msg, "not_trainable"))
+    if not errors:  # dry-run configure so a bad value is a 422, not a failed run
+        try:
+            probe_env = entries["environment"].cls(**resolved["environment"].params)
+            try:
+                ctl = entries["controller"].cls()
+                ctl.configure(
+                    probe_env.get_env_spec(),
+                    resolved["controller"].params,
+                    probe_env.get_linearization(),
+                )
+            finally:
+                probe_env.close()
+        except ValueError as exc:
+            errors.append(_err(["controller", "params"], str(exc), "invalid_configuration"))
     if errors:
         raise ConfigError(errors)
     return config.model_copy(update=resolved), entries["environment"], entries["controller"]
@@ -121,7 +135,7 @@ def _code_version() -> str:
         return "unknown"
 
 
-def collect_versions(env: Entry, controller: Entry) -> dict[str, str]:
+def collect_versions(env: Entry, controller: Entry, ctl_params: dict[str, Any]) -> dict[str, str]:
     """Library, platform and registry-entry versions (ADR 0010)."""
     versions = {"python": sys.version.split()[0], "platform": platform.platform()}
     for lib in _LIBS:
@@ -136,7 +150,7 @@ def collect_versions(env: Entry, controller: Entry) -> dict[str, str]:
 
         versions.update(
             cuda=torch.version.cuda or "none",
-            device="cpu",
+            device=str(ctl_params.get("device", "cpu")),
             num_threads=str(torch.get_num_threads()),
         )
     return versions
@@ -170,7 +184,7 @@ def execute(
         derived_seeds=seeds,
         config=resolved,
         config_hash=resolved.config_hash(),
-        versions=collect_versions(env_entry, ctl_entry),
+        versions=collect_versions(env_entry, ctl_entry, ctl_params),
         code_version=_code_version(),
     )
 

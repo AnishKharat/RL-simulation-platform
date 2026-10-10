@@ -24,7 +24,7 @@ def _metric_rows(m: MetricValue, episode: int | None) -> list[dict[str, Any]]:
         {
             "metric_name": n,
             "episode_index": episode,
-            "value": None if math.isnan(v) else v,
+            "value": v if math.isfinite(v) else None,
             "unit": u,
             "status": m.status,
         }
@@ -79,17 +79,22 @@ class JobManager:
     def _run(self, run_id: str, config: ExperimentConfig, seed: int) -> None:
         repo, stage, trained = self._repo, "starting", False
 
+        def tick(**fields: Any) -> None:
+            try:  # a lost progress update must never fail the run
+                repo.update_run(run_id, **fields)
+            except Exception:
+                log.warning("progress update for %s failed", run_id, exc_info=True)
+
         def on_stage(name: str) -> None:
             nonlocal stage, trained
             stage, trained = name, trained or name == "training"
-            repo.update_run(
-                run_id,
+            tick(
                 stage=name,
                 progress=_TRAIN_SHARE if name == "evaluating" and trained else 0.0,
             )
 
         def progress(done: int, total: int) -> None:
-            repo.update_run(run_id, progress=_TRAIN_SHARE * min(done / total, 1.0))
+            tick(progress=_TRAIN_SHARE * min(done / total, 1.0))
 
         try:
             repo.update_run(run_id, status="running")

@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -54,6 +54,12 @@ class Repository:
         if url in ("sqlite://", "sqlite:///:memory:"):
             kw["poolclass"] = StaticPool  # one shared connection for in-memory DBs
         self._engine = create_engine(url, **kw)
+        if url.startswith("sqlite") and ":memory:" not in url and url != "sqlite://":
+            with self._engine.connect() as c:  # WAL + wait on concurrent progress writes
+                c.exec_driver_sql("PRAGMA journal_mode=WAL")
+            event.listen(
+                self._engine, "connect", lambda con, _: con.execute("PRAGMA busy_timeout=30000")
+            )
         self._session = sessionmaker(self._engine, expire_on_commit=False)
         self.artifact_root = Path(artifact_root)
         Base.metadata.create_all(self._engine)  # Alembic arrives in Phase 5 (ADR 0008)
@@ -196,7 +202,7 @@ class Repository:
             id=_id(),
             run_id=run_id,
             kind=kind,
-            uri=str(path),
+            uri=str(path.resolve()),
             sha256=hashlib.sha256(blob).hexdigest(),
             size_bytes=len(blob),
         )
