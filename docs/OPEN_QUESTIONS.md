@@ -7,6 +7,8 @@
 
 - **Note (user decision, Phase 3 follow-up):** Arm RL controllers do not reach target; optional time-boxed reward-shaping attempt later. | **Raised by:** user, 2026-10-10 | **Affects:** planar_arm, Phase 3 benchmarks (not blocking)
 
+- **Q:** Approve ADR 0021 (review 5): new registry Kind `perturbation` + core `PerturbationMetadata`/`ParamPerturbation`, rollout recording `info["perturbed"]`, optional `perturbation` sweep in `BenchmarkSpec`/API? All additive, no existing signature changes. Also: should `disturbance` act only through the actuated input (proposed), or do you want an environment-level external-force hook (`apply_disturbance`, changes BaseEnvironment)? | **Raised by:** orchestrator, review 5, 2026-10-11 | **Affects:** core, registry, rollout, manager, API, Phase 4 (docs/architecture/phase4-robustness.md)
+
 ## Resolved
 
 - **Q:** Approve a new physics layer `rcl.physics` (PhysicsBackend implementations) between the plugin tier and core, which changes the frozen rule "environments import only `core` and `registry`" to "`core`, `registry` and `physics`" (CLAUDE.md 1.3, rcl/environments/CLAUDE.md, project_context 4, import-linter contracts)? Fallback without a rule change: backends as private modules inside `rcl/environments/`. | **Raised by:** orchestrator, review 4, 2026-10-10 | **Affects:** ADR 0019, pyproject contracts, Phase 3

@@ -60,11 +60,18 @@ Both read the rollout's success verdict (`EpisodeTrajectory.success`: the `TaskS
 - **time_to_success.** `(T - h + 1) * dt` for a successful episode: the time at which the final in-tolerance streak began (clamped at 0). An episode without success, including one ended by failure, is `T_max = horizon_steps * dt` with status `censored`, the same convention as settling_time; the per-run mean therefore mixes real times and bounds, and the report shows `n_censored`. Bootstrap interval across seeds.
 - **`return` is not the headline metric.** Success ends an episode early, so a controller that succeeds quickly collects fewer reward steps than one that never succeeds. Reports lead with these two metrics (`MetricInfo.headline`) and say so.
 
-## Phase 4 metrics (future, not implemented before Phase 4)
+## Phase 4 metrics (robustness; proposed in review 5, implemented in Phase 4)
 
-- **failure_count:** number of episodes in a perturbation suite with `terminated = true` (task failure per `TaskSpec`), reported as a count and as a rate over episodes.
-- **recovery_time:** after a perturbation applied at `t_p`, the time until `e` re-enters and stays in the 2% band: `t_{k_r} - t_p`, with `k_r` defined as in settling_time restricted to `k >= index(t_p)`. Never recovers: `T_max - t_p`, `censored`.
-- **degradation curve:** a metric value as a function of perturbation magnitude; not a single-episode metric.
+Notation as above: `T` recorded steps, `e_k` error, band `b = 0.02 * max(S, S_min)`, `T_max = horizon_steps * dt`.
+A *discrete event* is a perturbation injection at step `k_p` (`EpisodeTrajectory.perturbation_steps`, so `0 <= k_p < T`).
+
+- **failure_count.** Per run: number of evaluation episodes with `terminated = true`; also reported as the rate `count / N` (unit `fraction`). Every terminated episode counts, including one that failed before any event or at step 1. A success or a time-limit truncation is not a failure. Across seeds: mean and bootstrap interval of the rate.
+- **recovery_time.** Defined on the FIRST discrete event `k_p` of the episode: `k_r = min { k >= k_p : e_j <= b for all j in k..T }`, value `(k_r - k_p) * dt`.
+  - Within the band at `k_p` and for the rest of the episode: `0`.
+  - Never re-enters (`e_T > b`), or the episode terminated after the event: `T_max - k_p * dt`, status `censored`.
+  - `undefined` (excluded from the mean, counted in `n_undefined`): no discrete event in the episode, which covers continuous perturbations (noise, delay, parameter scale), an event scheduled at or beyond the episode end, and an episode that terminated before the event fired. (The failure still counts in `failure_count`.)
+  - Later events of the same episode are ignored; one event per episode is the design of the suite.
+- **degradation curve.** For a fixed (environment, controller, perturbation, `magnitude_param`) and a grid `m_0 < ... < m_n` that includes the nominal magnitude: for each `m_i` the per-seed value of a chosen metric (success_rate by default), then the cross-seed mean and interval (rules of the Phase 2 section). Not a single-episode metric. Companions: `relative_i = value_i / value_nominal` (`undefined` if the nominal value is 0) and `breakdown_magnitude`, the smallest grid magnitude above nominal at which the mean success_rate falls below half its nominal value (`undefined` if it never does, or if the nominal success_rate is 0). A non-monotone curve is reported as measured; the breakdown is the first crossing.
 
 ## NaN and edge-case policy
 
