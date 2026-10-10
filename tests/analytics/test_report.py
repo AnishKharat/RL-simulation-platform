@@ -67,3 +67,11 @@ def test_report_is_deterministic_and_handles_empty_summary():
     assert (a.markdown, a.html, a.plots) == (b.markdown, b.html, b.plots)
     empty = build_report("t", SPEC, [], METRIC_INFO)
     assert empty.plots == {} and "## Notes" in empty.markdown
+
+
+def test_skipped_pairs_section_in_markdown_and_html():
+    skipped = [{"env_id": "disc", "controller_id": "c1", "reason": "not <compatible>"}]
+    r = build_report("t", SPEC, SUMMARY, METRIC_INFO, skipped)
+    assert "## Skipped pairs" in r.markdown and "- c1 on disc: not <compatible>" in r.markdown
+    assert "<li>c1 on disc: not &lt;compatible&gt;</li>" in r.html
+    assert "Skipped pairs" not in build_report("t", SPEC, SUMMARY, METRIC_INFO).markdown

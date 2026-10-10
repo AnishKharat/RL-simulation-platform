@@ -110,3 +110,14 @@ def test_phase1_database_gets_suite_column(tmp_path):
     suite, _ = repo.create_suite("s", {})
     repo.create_experiment(cfg(), 0, {"train": 1, "eval": 2}, suite_id=suite)
     assert len(repo.get_suite(suite)["experiments"]) == 1
+
+
+def test_fail_orphans_also_fails_unfinished_benchmark_runs(repo):
+    _, running = repo.create_suite("s", {})
+    _, done = repo.create_suite("s2", {})
+    repo.update_benchmark_run(running, status="running")
+    repo.update_benchmark_run(done, status="done")
+    assert repo.fail_orphans() == 1
+    b = repo.get_benchmark_run(running)
+    assert b["status"] == "failed" and b["error"]["type"] == "interrupted" and b["finished_at"]
+    assert repo.get_benchmark_run(done)["status"] == "done"

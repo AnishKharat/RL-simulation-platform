@@ -95,7 +95,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     discover()
     try:
         spec = spec_from_args(args, registry)
-        plan(spec, registry)
+        _, skipped = plan(spec, registry)
     except (ConfigError, ValueError) as exc:
         errors = exc.errors if isinstance(exc, ConfigError) else [{"loc": [], "msg": str(exc)}]
         for e in errors:
@@ -108,7 +108,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     suite_id, bench_id = repo.create_suite(spec.name, spec.model_dump(mode="json"))
     run_stored_benchmark(repo, registry, bench_id, suite_id, spec, tracker)
     summary = summarize(repo.suite_metric_rows(suite_id))
-    report = build_report(spec.name, spec.model_dump(mode="json"), summary, METRIC_INFO)
+    report = build_report(
+        spec.name, spec.model_dump(mode="json"), summary, METRIC_INFO, [vars(k) for k in skipped]
+    )
     _write_outputs(out, summary, report)
     sys.stdout.write(report.markdown)
     bench = repo.get_benchmark_run(bench_id) or {}
