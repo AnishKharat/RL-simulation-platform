@@ -10,5 +10,5 @@
 - **Known limits:** `obs_noise` std is in absolute observation units; `param_scale` is one value per run; no PyBullet run with perturbations yet; CI status not checked (no `gh` here)
 - **Phase 7:** marked out of scope for now (simulation-only)
 - **Env:** project `.venv`; checks via `.venv/Scripts/python`
-- **Checks:** pytest 0 pass | ruff clean | mypy clean | lint-imports 12 kept
+- **Checks:** pytest 323 pass | ruff clean | mypy clean | lint-imports 12 kept
 - **Last updated:** 2026-10-11 by orchestrator
