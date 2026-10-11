@@ -242,27 +242,56 @@ def execute(
     If ``checkpoint_dir`` is given a trained controller is saved there. ``eval_wrapper`` wraps
     the evaluation environment only (e.g. a frame recorder); it must not change dynamics.
     """
+    return execute_sweep(
+        config,
+        None,
+        seed=seed,
+        registry=registry,
+        checkpoint_dir=checkpoint_dir,
+        on_stage=on_stage,
+        progress=progress,
+        eval_wrapper=eval_wrapper,
+    )[0]
+
+
+def execute_sweep(
+    config: ExperimentConfig,
+    eval_stacks: list[list[PerturbationConfig]] | None,
+    *,
+    seed: int | None = None,
+    registry: Registry | None = None,
+    checkpoint_dir: Path | None = None,
+    on_stage: Callable[[str], None] | None = None,
+    progress: Callable[[int, int], bool | None] | None = None,
+    eval_wrapper: Callable[[BaseEnvironment], BaseEnvironment] | None = None,
+) -> list[RunResult]:
+    """Train ONCE, then evaluate the same policy under each perturbation stack in ``eval_stacks``
+    (one :class:`RunResult` per stack, same eval seeds, so every level sees identical initial
+    states; docs/architecture/phase4-robustness.md section 4). Training uses ``config``'s own
+    perturbations. ``None`` means one evaluation with ``config.perturbations`` (:func:`execute`).
+    Stacks are resolved/validated like ``config.perturbations``.
+    """
     reg = registry or get_registry()
     resolved, env_entry, ctl_entry = resolve_config(config, reg)
+    stacks = [resolved.perturbations]
+    if eval_stacks is not None:
+        stacks = [
+            resolve_config(config.model_copy(update={"perturbations": st}), reg)[0].perturbations
+            for st in eval_stacks
+        ]
     env_params = resolved.environment.params
     ctl_params = resolved.controller.params
     needs_training = ctl_entry.metadata.requires_training
     run_seed = config.seed if seed is None else seed
     seeds = derive_seeds(run_seed)
-    record = RunRecord(
-        seed=run_seed,
-        derived_seeds=seeds,
-        config=resolved,
-        config_hash=resolved.config_hash(),
-        versions=collect_versions(env_entry, ctl_entry, ctl_params),
-        code_version=_code_version(),
-    )
+    versions = collect_versions(env_entry, ctl_entry, ctl_params)
+    code_version = _code_version()
 
     def env_factory() -> BaseEnvironment:
         return build_env(env_entry, env_params, resolved.perturbations, reg, "train")
 
     env = env_entry.cls(**env_params)  # nominal: the controller is configured on this one
-    eval_env: BaseEnvironment = env
+    results: list[RunResult] = []
     try:
         controller = ctl_entry.cls()
         controller.configure(env.get_env_spec(), ctl_params, env.get_linearization())
@@ -280,17 +309,38 @@ def execute(
                 controller.save(checkpoint_dir)
         if on_stage:
             on_stage("evaluating")
-        if any(p.apply_to in ("eval", "both") for p in resolved.perturbations):
-            eval_env = build_env(env_entry, env_params, resolved.perturbations, reg, "eval")
-        if eval_wrapper is not None:
-            eval_env = eval_wrapper(eval_env)
-        trajectories = rollout(eval_env, controller, config.evaluation.episodes, seeds["eval"])
         task = env.get_task_spec()
+        for stack in stacks:
+            run_config = resolved.model_copy(update={"perturbations": stack})
+            eval_env = build_env(env_entry, env_params, stack, reg, "eval")  # fresh per stack
+            try:
+                if eval_wrapper is not None:
+                    eval_env = eval_wrapper(eval_env)
+                trajectories = rollout(
+                    eval_env, controller, config.evaluation.episodes, seeds["eval"]
+                )
+            finally:
+                eval_env.close()
+            episode_metrics = [compute_metrics(t, task) for t in trajectories]
+            record = RunRecord(
+                seed=run_seed,
+                derived_seeds=seeds,
+                config=run_config,
+                config_hash=run_config.config_hash(),
+                versions=versions,
+                code_version=code_version,
+            )
+            results.append(
+                RunResult(
+                    record,
+                    train_result,
+                    trajectories,
+                    episode_metrics,
+                    aggregate(episode_metrics),
+                    task,
+                )
+            )
     finally:
-        eval_env.close()
         env.close()
-    episode_metrics = [compute_metrics(t, task) for t in trajectories]
     log.info("run done: %s on %s seed=%d", ctl_entry.id, env_entry.id, run_seed)
-    return RunResult(
-        record, train_result, trajectories, episode_metrics, aggregate(episode_metrics), task
-    )
+    return results
