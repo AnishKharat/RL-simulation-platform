@@ -29,8 +29,8 @@ Phase 3 gains. Planar arm is skipped: no controller ever reached its task (Phase
 | Balance bot | PID | 0 / 0 / 0 / 0 / 0 | 0 / 0 / 0 / 0 | 0 / 0 / **1 / 1** |
 | Balance bot | LQR | 1.0 / **0** / 0 / 0 / 0 | 1 / 1 / 0.96 / 0 | 1 / 1 / 1 / **0** |
 
-Failure rate (episodes that terminated) tells the same story: CartPole PID/LQR fail 8% / 4% at noise 0.25-0.5 and
-92% / 100% at 1.0; the balance-bot LQR fails in 100% of episodes at disturbance 1.0 and mass x4; balance-bot PID fails
+Failure rate (episodes that terminated) tells the same story: CartPole PID fails 8% / 32% / 92% of episodes at noise 0.25 / 0.5 / 1.0 and LQR 0% / 4% / 100%
+(success collapses earlier than failure: noisy episodes survive but leave the tolerance band); the balance-bot LQR fails in 100% of episodes at disturbance 1.0 and mass x4; balance-bot PID fails
 12% at noise 0.5 and 100% at 1.0. See `robustness.csv` for the numbers and intervals.
 
 ## What this shows, and what it does not
