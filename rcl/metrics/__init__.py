@@ -96,7 +96,7 @@ METRIC_INFO.extend(
         ),
         MetricInfo(
             name="recovery_time",
-            description="Time from the first perturbation event to staying in the 2% band.",
+            description="Time from the first perturbation event until the state stays within the task tolerance.",
             unit="s",
             higher_is_better=False,
             ci_method="bootstrap",

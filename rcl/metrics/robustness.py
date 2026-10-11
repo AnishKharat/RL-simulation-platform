@@ -12,8 +12,8 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 
 from rcl.core.types import EpisodeTrajectory, TaskSpec
-from rcl.metrics.dynamics import _geometry, _t_max
-from rcl.metrics.metrics import MetricValue, _check, _undefined
+from rcl.metrics.dynamics import _t_max
+from rcl.metrics.metrics import MetricValue, _check, _undefined, wrap_angle
 
 
 def failure_count(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
@@ -26,11 +26,21 @@ def failure_count(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
     return MetricValue(name="failure_count", value=1.0 if traj.terminated else 0.0, unit="fraction")
 
 
+def _in_tolerance(traj: EpisodeTrajectory, task: TaskSpec) -> np.ndarray:
+    """Per state sample: the TaskSpec success rule (|wrap(x - setpoint)| <= tolerance, all
+    components), the same test the rollout applies."""
+    d = traj.states - np.asarray(task.setpoint)
+    w = list(task.wrap_indices)
+    d[:, w] = wrap_angle(d[:, w])
+    return np.asarray(np.all(np.abs(d) <= np.asarray(task.tolerance), axis=1))
+
+
 def recovery_time(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
-    """Time from the first discrete perturbation event until the error stays within the 2% band.
+    """Time from the first discrete perturbation event until the state stays within the task's
+    success tolerance (DEFINITIONS.md).
 
     Undefined without an event; censored (``T_max - k_p * dt``) if the episode failed after the
-    event or never re-enters the band.
+    event or the state never stays in tolerance until the end.
     """
     unit = "s"
     if not _check(traj):
@@ -38,10 +48,8 @@ def recovery_time(traj: EpisodeTrajectory, task: TaskSpec) -> MetricValue:
     if not traj.perturbation_steps:
         return _undefined("recovery_time", unit)
     k_p = min(traj.perturbation_steps)
-    e, s, _, _ = _geometry(traj, task)
-    band = 0.02 * max(s, task.step_floor)
-    outside = np.flatnonzero(e[k_p:] > band)
-    if traj.terminated or (len(outside) and outside[-1] == len(e) - k_p - 1):
+    outside = np.flatnonzero(~_in_tolerance(traj, task)[k_p:])
+    if traj.terminated or (len(outside) and outside[-1] == traj.n_steps - k_p):
         return MetricValue(
             name="recovery_time",
             value=_t_max(traj, task) - k_p * traj.dt,

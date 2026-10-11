@@ -17,7 +17,7 @@ TASK = TaskSpec(
     setpoint=(0.0,),
     tolerance=(0.1,),
     error_state_indices=(0,),
-    step_floor=1.0,  # band = 0.02
+    step_floor=1.0,
     horizon_steps=100,
     success_hold_steps=5,
 )
@@ -47,13 +47,30 @@ def test_failure_count_counts_every_terminated_episode_and_mean_is_the_rate():
 
 
 def test_recovery_time_measures_from_the_event_to_the_final_return_to_the_band():
-    # event at k=2, error is outside the band at k=2..4, inside from k=5
+    # event at k=2, outside the tolerance (0.1, inclusive) at k=2,3, inside from k=4
     m = recovery_time(traj([0, 0, 0.5, 0.4, 0.1, 0.0, 0.0], events=[2]), TASK)
-    assert (m.value, m.status) == (pytest.approx(0.3), "ok")
+    assert (m.value, m.status) == (pytest.approx(0.2), "ok")
 
 
 def test_recovery_time_is_zero_when_the_band_is_never_left():
     assert recovery_time(traj([0, 0.01, 0.0, 0.0], events=[1]), TASK).value == 0.0
+    assert recovery_time(traj([0, 0.09, 0.1, 0.0], events=[1]), TASK).value == 0.0  # edge: <=
+
+
+def test_recovery_time_is_censored_when_the_episode_fails_right_after_the_event():
+    m = recovery_time(traj([0.0, 0.5], events=[0], terminated=True), TASK)
+    assert (m.value, m.status) == (pytest.approx(10.0), "censored")  # T_max, event at 0
+
+
+def test_recovery_time_uses_task_tolerance_per_component_and_wraps_angles():
+    task = TaskSpec(
+        setpoint=(0.0, 0.0), tolerance=(0.1, 1e9), error_state_indices=(0,), wrap_indices=(0,),
+        step_floor=1.0, horizon_steps=100, success_hold_steps=5,
+    )  # fmt: skip
+    states = np.array([[0.0, 5.0], [0.5, 5.0], [2 * np.pi + 0.05, -7.0], [0.0, 9.0]])
+    t = traj([0, 0, 0, 0], events=[1])
+    t = EpisodeTrajectory(**{**t.__dict__, "states": states})
+    assert recovery_time(t, task).value == pytest.approx(0.1)  # wrapped 0.05 is inside at k=2
 
 
 def test_recovery_time_is_censored_when_it_never_returns_or_fails_afterwards():
