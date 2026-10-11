@@ -412,6 +412,7 @@ class Repository:
                 MetricResultRow.value,
                 MetricResultRow.unit,
                 MetricResultRow.status,
+                ExperimentRow.config["perturbations"],
             )
             .join(RunRow, RunRow.experiment_id == ExperimentRow.id)
             .join(MetricResultRow, MetricResultRow.run_id == RunRow.id)
@@ -436,6 +437,7 @@ class Repository:
             "value",
             "unit",
             "status",
+            "perturbations",  # the run's resolved stack (a robustness sweep varies it per level)
         )
         with self._session() as s:
             return [dict(zip(keys, row, strict=True)) for row in s.execute(q)]

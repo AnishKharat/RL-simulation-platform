@@ -90,7 +90,7 @@ Design: `docs/architecture/phase4-robustness.md`, ADR 0021.
 - ☑ Perturbation wrappers (obs/action noise, action delay, disturbance, param_scale) + tests
 - ☑ Manager builds the stack, rollout records perturbed steps, spec-only config_hash test
 - ☑ Robustness metrics (failure count, recovery time, degradation curves) + tests
-- ☐ Robustness benchmark suite (runner, persistence, analytics with CIs)
+- ☑ Robustness benchmark suite (runner, persistence, analytics with CIs)
 - ☐ API (`/perturbations`, robustness endpoint) and dashboard robustness page
 - ☐ Modularity proof: dummy perturbation in a temporary package
 - ☐ Phase 4 benchmark (balance_bot, CartPole) and honest README

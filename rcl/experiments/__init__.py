@@ -4,12 +4,21 @@ from rcl.experiments.benchmark import (
     BenchmarkResult,
     BenchmarkSpec,
     Cell,
+    RobustnessSpec,
     Skipped,
+    level_stacks,
     plan,
     run_benchmark,
 )
 from rcl.experiments.jobs import JobManager, run_stored_benchmark
-from rcl.experiments.manager import ConfigError, RunResult, derive_seeds, execute, resolve_config
+from rcl.experiments.manager import (
+    ConfigError,
+    RunResult,
+    derive_seeds,
+    execute,
+    execute_sweep,
+    resolve_config,
+)
 from rcl.experiments.rollout import rollout
 from rcl.experiments.tracking import MlflowTracker, Tracker
 from rcl.metrics import METRIC_INFO, MetricInfo
@@ -21,6 +30,9 @@ __all__ = [
     "BenchmarkResult",
     "BenchmarkSpec",
     "Cell",
+    "RobustnessSpec",
+    "level_stacks",
+    "execute_sweep",
     "Skipped",
     "plan",
     "run_benchmark",

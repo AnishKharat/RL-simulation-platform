@@ -7,9 +7,14 @@ import math
 from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Any
 
-from rcl.core.config import ExperimentConfig
-from rcl.experiments.benchmark import BenchmarkSpec, plan
-from rcl.experiments.manager import RunResult, derive_seeds, execute, resolve_config
+from rcl.core.config import ExperimentConfig, PerturbationConfig
+from rcl.experiments.benchmark import BenchmarkSpec, level_stacks, plan
+from rcl.experiments.manager import (
+    RunResult,
+    derive_seeds,
+    execute_sweep,
+    resolve_config,
+)
 from rcl.experiments.tracking import Tracker
 from rcl.metrics import MetricValue
 from rcl.persistence import Repository
@@ -105,8 +110,12 @@ def run_and_store(
     config: ExperimentConfig,
     seed: int,
     tracker: Tracker | None = None,
+    sweep: tuple[list[str], list[list[PerturbationConfig]]] | None = None,
 ) -> bool:
     """Execute one queued run and persist its results; returns False if it failed.
+
+    ``sweep = (run_ids, eval_stacks)`` trains once and stores the evaluation under each stack in
+    its own run (``run_ids[0]`` is ``run_id``, which owns the checkpoint and progress).
 
     Never raises: any exception becomes a ``failed`` run (a worker must never die silently).
     """
@@ -126,10 +135,13 @@ def run_and_store(
     def progress(done: int, total: int) -> None:
         tick(progress=_TRAIN_SHARE * min(done / total, 1.0))
 
+    run_ids, stacks = sweep or ([run_id], None)
     try:
-        repo.update_run(run_id, status="running")
-        result = execute(
+        for rid in run_ids:
+            repo.update_run(rid, status="running")
+        results = execute_sweep(
             config,
+            stacks,
             seed=seed,
             registry=registry,
             checkpoint_dir=repo.checkpoint_dir(run_id),
@@ -138,13 +150,16 @@ def run_and_store(
         )
         stage = "saving"
         repo.update_run(run_id, stage=stage, progress=0.95)
-        repo.save_results(run_id, **to_rows(result))
+        for rid, res in zip(run_ids, results, strict=True):
+            repo.save_results(rid, **to_rows(res))
+        result = results[0]
         if result.train is not None:  # DB is already complete: tracking problems never fail a run
             _record_training(repo, tracker, run_id, result)
         return True
     except Exception as exc:  # job boundary
         log.exception("run %s failed in stage %s", run_id, stage)
-        repo.fail_run(run_id, type(exc).__name__, str(exc), stage)
+        for rid in run_ids:
+            repo.fail_run(rid, type(exc).__name__, str(exc), stage)
         return False
 
 
@@ -162,19 +177,36 @@ def run_stored_benchmark(
     try:
         repo.update_benchmark_run(bench_id, status="running")
         pairs, _ = plan(spec, registry)
-        queued: list[tuple[str, ExperimentConfig, int]] = []
+        levels = level_stacks(spec, registry)
+        stacks = [st for _, st in levels]
+        queued: list[
+            tuple[list[str], ExperimentConfig, int, list[list[PerturbationConfig]] | None]
+        ] = []
         for env, ctl in pairs:
-            first = spec.experiment(env, ctl, spec.seeds[0])
-            resolved, _, _ = resolve_config(first, registry)
-            exp_id, run_id = repo.create_experiment(
-                resolved, spec.seeds[0], derive_seeds(spec.seeds[0]), suite_id=suite_id
-            )
-            queued.append((run_id, resolved, spec.seeds[0]))
+            base, _, _ = resolve_config(spec.experiment(env, ctl, spec.seeds[0]), registry)
+            cfgs = [base]  # one experiment per sweep level (its config holds that level's stack)
+            if levels:
+                cfgs = [
+                    resolve_config(spec.experiment(env, ctl, spec.seeds[0], st), registry)[0]
+                    for st in stacks
+                ]
+                cfgs = [
+                    c.model_copy(update={"name": f"{c.name}@{lv}"})
+                    for c, (lv, _) in zip(cfgs, levels, strict=True)
+                ]
+            first = spec.seeds[0]
+            created = [
+                repo.create_experiment(c, first, derive_seeds(first), suite_id=suite_id)
+                for c in cfgs
+            ]
+            queued.append(([r for _, r in created], base, first, stacks or None))
             for seed in spec.seeds[1:]:
-                queued.append((repo.add_run(exp_id, seed, derive_seeds(seed)), resolved, seed))
+                ids = [repo.add_run(e, seed, derive_seeds(seed)) for e, _ in created]
+                queued.append((ids, base, seed, stacks or None))
         failed = 0
-        for done, (run_id, config, seed) in enumerate(queued, start=1):
-            failed += not run_and_store(repo, registry, run_id, config, seed, tracker)
+        for done, (run_ids, config, seed, sts) in enumerate(queued, start=1):
+            sweep = (run_ids, sts) if sts else None
+            failed += not run_and_store(repo, registry, run_ids[0], config, seed, tracker, sweep)
             repo.update_benchmark_run(bench_id, progress=done / len(queued))
         if failed:
             error = {"type": "RunsFailed", "message": f"{failed} of {len(queued)} runs failed"}

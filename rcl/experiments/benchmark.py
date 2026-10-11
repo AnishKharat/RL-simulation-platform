@@ -10,8 +10,10 @@ silently dropped.
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -19,12 +21,31 @@ from rcl.core.config import (
     ComponentConfig,
     EvaluationSection,
     ExperimentConfig,
+    PerturbationConfig,
     TrainingSection,
 )
 from rcl.experiments.manager import ConfigError, RunResult, execute, resolve_config
-from rcl.registry import Registry, get_registry
+from rcl.registry import Registry, UnknownIdError, get_registry
 
 log = logging.getLogger(__name__)
+
+
+class RobustnessSpec(BaseModel):
+    """A degradation sweep: one perturbation evaluated at each of ``levels``, which replace
+    ``params[magnitude_param]`` (the nominal level is always added). Training is nominal."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    params: dict[str, Any] = Field(default_factory=dict)
+    levels: list[float] = Field(min_length=1)
+
+    @field_validator("levels")
+    @classmethod
+    def _levels_ok(cls, v: list[float]) -> list[float]:
+        if len(set(v)) != len(v) or not all(math.isfinite(x) for x in v):
+            raise ValueError("levels must be unique finite numbers")
+        return v
 
 
 class BenchmarkSpec(BaseModel):
@@ -38,6 +59,7 @@ class BenchmarkSpec(BaseModel):
     seeds: list[int] = Field(min_length=1)
     episodes: int = Field(gt=0)
     training: TrainingSection | None = None
+    perturbation: RobustnessSpec | None = None
 
     @field_validator("seeds")
     @classmethod
@@ -54,16 +76,52 @@ class BenchmarkSpec(BaseModel):
             raise ValueError("component ids must be unique within a benchmark")
         return v
 
-    def experiment(self, env: ComponentConfig, ctl: ComponentConfig, seed: int) -> ExperimentConfig:
+    def experiment(
+        self,
+        env: ComponentConfig,
+        ctl: ComponentConfig,
+        seed: int,
+        perturbations: list[PerturbationConfig] | None = None,
+    ) -> ExperimentConfig:
         """The ExperimentConfig of one (env, controller, seed) run."""
         return ExperimentConfig(
             name=f"{self.name}:{env.id}:{ctl.id}",
+            perturbations=perturbations or [],
             seed=seed,
             environment=env,
             controller=ctl,
             training=self.training,
             evaluation=EvaluationSection(episodes=self.episodes),
         )
+
+
+def level_stacks(
+    spec: BenchmarkSpec, registry: Registry
+) -> list[tuple[float, list[PerturbationConfig]]]:
+    """``(level, eval perturbation stack)`` per sweep level, ascending, nominal included; empty
+    if the spec has no sweep. Raises ``ConfigError`` for an unknown perturbation id."""
+    if spec.perturbation is None:
+        return []
+    try:
+        meta = registry.get("perturbation", spec.perturbation.id).metadata
+    except UnknownIdError as exc:
+        raise ConfigError(
+            [{"loc": ["perturbation", "id"], "msg": str(exc.args[0]), "type": "unknown_id"}]
+        ) from exc
+    levels = sorted({*spec.perturbation.levels, meta.nominal_magnitude})
+    return [
+        (
+            lv,
+            [
+                PerturbationConfig(
+                    id=spec.perturbation.id,
+                    params={**spec.perturbation.params, meta.magnitude_param: lv},
+                    apply_to="eval",
+                )
+            ],
+        )
+        for lv in levels
+    ]
 
 
 @dataclass
@@ -98,10 +156,12 @@ def plan(
     pairs: list[tuple[ComponentConfig, ComponentConfig]] = []
     skipped: list[Skipped] = []
     errors: list[dict[str, object]] = []
+    stacks = [st for _, st in level_stacks(spec, registry)] or [[]]
     for i, env in enumerate(spec.environments):
         for j, ctl in enumerate(spec.controllers):
             try:
-                resolve_config(spec.experiment(env, ctl, spec.seeds[0]), registry)
+                for st in stacks:
+                    resolve_config(spec.experiment(env, ctl, spec.seeds[0], st), registry)
             except ConfigError as exc:
                 if all(e["type"] == "incompatible" for e in exc.errors):
                     skipped.append(Skipped(env.id, ctl.id, exc.errors[0]["msg"]))
@@ -112,6 +172,8 @@ def plan(
                         loc = ["environments", i, *loc[1:]]
                     elif loc[0] == "controller":
                         loc = ["controllers", j, *loc[1:]]
+                    elif loc[0] == "perturbations":
+                        loc = ["perturbation", *loc[2:]]
                     item = {**e, "loc": loc, "cell": [env.id, ctl.id]}
                     if not any(x["loc"] == loc and x["type"] == e["type"] for x in errors):
                         errors.append(item)
@@ -144,6 +206,10 @@ def run_benchmark(
     (the result then holds only the completed runs of the last cell).
     """
     reg = registry or get_registry()
+    if spec.perturbation is not None:  # sweeps are stored runs (run_stored_benchmark)
+        raise ConfigError(
+            [{"loc": ["perturbation"], "msg": "use run_stored_benchmark", "type": "unsupported"}]
+        )
     pairs, skipped = plan(spec, reg)
     total, done, cells = len(pairs) * len(spec.seeds), 0, []
     for env, ctl in pairs:

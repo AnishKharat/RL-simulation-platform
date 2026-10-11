@@ -93,6 +93,7 @@ def test_metric_rows_only_finished_runs_and_run_level_values(repo):
             "value": 1.5,
             "unit": "r",
             "status": "ok",
+            "perturbations": [],
         }
     ]
     assert r1 not in {r["run_id"] for r in rows}
