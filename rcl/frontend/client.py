@@ -73,3 +73,15 @@ def benchmark(suite_id: str) -> dict[str, Any]:
 
 def benchmark_summary(suite_id: str, env_id: str | None = None) -> list[dict[str, Any]]:
     return list(_get(f"/benchmarks/{suite_id}/summary", **({"env_id": env_id} if env_id else {})))
+
+
+def perturbations() -> list[dict[str, Any]]:
+    return list(_get("/perturbations"))
+
+
+def robustness(suite_id: str, env_id: str, metric: str) -> tuple[int, Any]:
+    """Degradation curves of a sweep benchmark; ``(status_code, json)`` (422: not a sweep)."""
+    r = _http().get(
+        f"/benchmarks/{suite_id}/robustness", params={"env_id": env_id, "metric": metric}
+    )
+    return r.status_code, r.json()

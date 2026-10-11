@@ -141,3 +141,42 @@ def summary_table(rows: list[dict[str, Any]], metric: str | None = None) -> list
             }
         )
     return out
+
+
+def degradation_figure(curves: list[dict[str, Any]], x_title: str = "level") -> go.Figure:
+    """One line per controller: cross-seed mean vs sweep level with 95% interval whiskers.
+
+    ``curves`` are API ``CurveOut`` dicts (one metric, one environment)."""
+    fig = go.Figure()
+    for c in sorted(curves, key=lambda c: c["controller_id"]):
+        pts = c["points"]
+        up = [p["ci_high"] - p["mean"] if p["ci_high"] is not None else 0.0 for p in pts]
+        down = [p["mean"] - p["ci_low"] if p["ci_low"] is not None else 0.0 for p in pts]
+        fig.add_scatter(
+            x=[p["level"] for p in pts],
+            y=[p["mean"] for p in pts],
+            name=c["controller_id"],
+            mode="lines+markers",
+            error_y={"type": "data", "symmetric": False, "array": up, "arrayminus": down},
+        )
+    fig.update_layout(
+        xaxis_title=x_title, yaxis_title=curves[0]["metric_name"] if curves else "", height=400
+    )
+    return fig
+
+
+def degradation_table(curves: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One display row per (controller, level); the breakdown level repeats on each row."""
+    return [
+        {
+            "controller": c["controller_id"],
+            "level": p["level"],
+            "mean": _fmt(p["mean"]),
+            "95% interval": f"[{_fmt(p['ci_low'])}, {_fmt(p['ci_high'])}] ({p['ci_method']})",
+            "relative to nominal": _fmt(p["relative"]),
+            "seeds (valid/total)": f"{p['n_valid']}/{p['n_total']}",
+            "breakdown level": _fmt(c["breakdown"]),
+        }
+        for c in sorted(curves, key=lambda c: c["controller_id"])
+        for p in c["points"]
+    ]
