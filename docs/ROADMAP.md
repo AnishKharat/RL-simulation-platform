@@ -6,9 +6,9 @@
 | Phase | Goal | Exit criteria | Status |
 |-------|------|---------------|--------|
 | 0 | Architecture freeze | 3 review iterations, interfaces frozen, ADRs, import-linter | ☑ |
-| 1 | MVP vertical slice | Pick env + controller in dashboard, run, see plot + metrics; same seed reproduces | ☐ |
-| 2 | Benchmarking | One command gives PID/LQR/PPO/SAC table + plots with CIs across seeds | ☐ |
-| 3 | PyBullet robots | ≥2 PyBullet robots benchmarked by ≥3 controllers, no controller changes | ☐ |
+| 1 | MVP vertical slice | Pick env + controller in dashboard, run, see plot + metrics; same seed reproduces | ☑ |
+| 2 | Benchmarking | One command gives PID/LQR/PPO/SAC table + plots with CIs across seeds | ☑ |
+| 3 | PyBullet robots | ≥2 PyBullet robots benchmarked by ≥3 controllers, no controller changes | ☑ |
 | 4 | Robustness | Perturbation wrappers, robustness metrics, robustness suite | ☐ |
 | 5 | Professional platform | Next.js UI, Postgres, MLflow server, Docker Compose, CI/CD, basic auth | ☐ |
 | 6 | Research-grade | MuJoCo backend, MPC, higher-fidelity models | ☐ |
@@ -58,7 +58,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☑ Modularity proof (commit as `test(env): prove 1-file extensibility`): a test writes a dummy environment (one file, one decorator) into a temporary package outside `rcl/environments` and calls `discover(packages=[tmp_pkg])` on an isolated `Registry`; at API level, with `TestClient`, the new id must appear in `GET /environments`, `POST /experiments` with a compatible controller must return 202, and the run must reach `done`. No dummy environment is ever added to `rcl/environments`.
 - ☑ README quickstart
 - ☐ Screenshots of the dashboard (needs a browser session; add under docs/img)
-- ☐ Tag `phase-1-complete`
+- ☑ Tag `phase-1-complete`
 
 ## Phase 2 — Benchmarking
 - ☑ LQR controller (+ linearization on environments) + tests
@@ -72,7 +72,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☑ MLflow integration
 - ☑ Comparison dashboard page
 - ☑ Report export (Markdown/HTML)
-- ☐ Tag `phase-2-complete`
+- ☑ Tag `phase-2-complete`
 
 ## Phase 3 — Advanced Robotics
 - ☑ `PhysicsBackend` abstraction + tests
@@ -82,7 +82,7 @@ Tag each finished phase `git tag -a phase-N-complete -m "Phase N complete: <summ
 - ☑ Rendering/visualization support (GIF CLI `python -m rcl.benchmark.gif`)
 - ☑ Verify existing controllers run unchanged on new robots (test)
 - ☑ Benchmark results on new robots + docs
-- ☐ Tag `phase-3-complete`
+- ☑ Tag `phase-3-complete`
 
 ## Phase 4 — Robustness
 Design: `docs/architecture/phase4-robustness.md`, ADR 0021.
