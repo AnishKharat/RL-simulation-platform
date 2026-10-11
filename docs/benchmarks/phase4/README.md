@@ -44,16 +44,26 @@ Failure rate (episodes that terminated) tells the same story: CartPole PID fails
 - **Mass mismatch**: CartPole is insensitive to pole mass x0.5 to x4 for both controllers; the balance-bot LQR breaks
   at chassis mass x4 (breakdown level 4.0) while its PID does not fail.
 - **Unexpected, reported as measured:** (1) the balance-bot LQR fails in every episode already at noise 0.1 of the
-  1 N*m torque limit, much harsher than on CartPole; I did not investigate whether this is the robot, the LQR gains or
-  the noise model. (2) The balance-bot PID never reaches the 0.02 rad success band at nominal (Phase 3: it balances
+  1 N*m torque limit, much harsher than on CartPole; see the probe below. (2) The balance-bot PID never reaches the 0.02 rad success band at nominal (Phase 3: it balances
   but outside the band) yet succeeds at chassis mass x2 and x4, so its "success" curve rises with the perturbation;
   that is a nominal-tuning effect, not robustness. Its breakdown level is undefined.
 - **PPO is not informative.** The 20k-step CartPole PPO never succeeds and fails every episode at every level, including
   nominal, so there is no degradation to measure. This benchmark gives no evidence about RL robustness.
-- **`recovery_time` is not usable on these tasks.** It is defined with a 2% band of `max(S, step_floor)` = 1 mrad
-  here, while success only needs 0.02 rad and success ends the episode, so nearly every recovery is censored at
-  `T_max - t_p` (about 8.8 s for LQR, a bit under 2 s for CartPole PID). The column in `robustness.csv` reflects that
-  definition, not recovery quality. Raised in `docs/OPEN_QUESTIONS.md`.
+- **`recovery_time`** (band = the task's success tolerance, decision 2026-10-11; the first version used a 2% band of
+  about 1 mrad, which censored nearly every recovery, so the two disturbance sweeps were re-run). It exists only in the
+  disturbance sweeps (the only ones with a discrete event); other sweeps report it undefined. Mean seconds at pulse
+  0.25 / 0.5 / 1.0 of the actuator limit: CartPole PID 0.26 / 0.35 / 0.65, CartPole LQR 0.45 / 1.5 / 2.0, balance-bot
+  LQR 1.4 / 1.8 / 8.8 (8.8 = censored: it fails at 1.0). Balance-bot PID is 8.8 everywhere and CartPole PPO 8.9, both
+  censored because they are never in tolerance, not because of the pulse. A censored value is `T_max - t_p`, so means
+  mixing censored and real values are bounds, not times.
+- **Probe of the two unexplained balance-bot results** (one seeded episode each, seed 0, not investigated further):
+  LQR under action noise looks like real behaviour, not a bug: its nominal commands are tiny (mean |u| 0.002 N*m of a
+  1 N*m limit), noise std is a fraction of the limit, so 0.01 still succeeds, 0.03 survives 500 steps without holding
+  the band and 0.1 (0.1 N*m, about 50x the nominal command) falls at step 356. (The sweep was `action_noise`, not
+  observation noise.) PID with the Phase 3 gains looks like real behaviour too: at nominal mass it saturates the torque
+  on 28% of steps and never holds the 0.02 rad band (RMS pitch 0.038), while at chassis mass x2 and x4 it commands
+  small smooth torques (max |u| 0.065) and succeeds in 100 steps; this is consistent with over-aggressive nominal gains
+  but I did not test that explanation.
 - **Limits:** one parameter value per run (no per-episode randomisation); no PyBullet run mixes perturbations; one
   perturbation per sweep; 5 seeds; one trained policy per (controller, seed) so the trained RL result is a single
   short run. The disturbance saturation above also applies to the balance bot.

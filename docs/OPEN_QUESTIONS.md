@@ -10,6 +10,10 @@
 
 ## Resolved
 
+- **Q:** `recovery_time` uses a 2% band of `max(S, step_floor)` (1 mrad for CartPole and the balance bot), but success needs 0.02 rad and success ends the episode, so nearly every recovery is censored at `T_max - t_p` (Phase 4 benchmark). Options: (a) keep the definition and document that it is unusable on balance tasks; (b) use the task tolerance as the recovery band; (c) a per-task `recovery_band` in `TaskSpec`. | **Raised by:** orchestrator, 2026-10-11 | **Affects:** metrics DEFINITIONS.md, TaskSpec (core)
+  **Resolved 2026-10-11 (user): (b)** the recovery band is the task's success tolerance (the `TaskSpec` success rule); metric and DEFINITIONS.md only, no TaskSpec/core change. The two disturbance sweeps were re-run.
+
+
 - **Q:** Approve ADR 0021 (review 5): new registry Kind `perturbation`, rollout recording, optional sweep in `BenchmarkSpec`/API, and how `disturbance` acts (actuated input vs an `apply_disturbance` hook)? | **Raised by:** orchestrator, review 5, 2026-10-11 | **Affects:** core, registry, rollout, manager, API, Phase 4
   **Resolved 2026-10-11 (user approved):** ADR 0021 Accepted. `disturbance` acts through the actuator channel; NO `apply_disturbance` hook. Conditions: explicit import-linter contract for `rcl.perturbations`; `config_hash` computed from the spec inputs only (never from recorded `perturbation_steps`); disturbance/clipping order documented.
 
@@ -35,9 +39,6 @@
   **Decision (architecture review 1, 2026-10-10): (a).** Details and rationale: `docs/architecture/registry.md` section 1, ADR 0003.  `core` stays types-only (store, discovery and JSON-schema export are behaviour); the registry imports only `core` and loads env/controller modules by name (no static cycle). import-linter has a "registry imports only core" contract and a registry layer between env/controller and core. `project_context.md` section 4 updated.
 
 
-
-- **Q:** `recovery_time` uses a 2% band of `max(S, step_floor)` (1 mrad for CartPole and the balance bot), but success needs 0.02 rad and success ends the episode, so nearly every recovery is censored at `T_max - t_p` (Phase 4 benchmark). Options: (a) keep the definition and document that it is unusable on balance tasks; (b) use the task tolerance as the recovery band; (c) a per-task `recovery_band` in `TaskSpec`. | **Raised by:** orchestrator, 2026-10-11 | **Affects:** metrics DEFINITIONS.md, TaskSpec (core)
-  **Open.** (a) applied for now.
 
 <!-- Entry format:
 - **Q:** <question>  | **Raised by:** <agent/date> | **Affects:** <module/phase>

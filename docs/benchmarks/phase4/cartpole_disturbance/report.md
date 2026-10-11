@@ -146,7 +146,7 @@ Fraction of episodes that ended in failure (terminated). (lower is better; inter
 
 ### recovery_time
 
-Time from the first perturbation event to staying in the 2% band. (lower is better; interval: bootstrap.)
+Time from the first perturbation event until the state stays within the task tolerance. (lower is better; interval: bootstrap.)
 
 | controller | mean | 95% interval | seeds (valid/total) | unit | notes |
 |---|---|---|---|---|---|
