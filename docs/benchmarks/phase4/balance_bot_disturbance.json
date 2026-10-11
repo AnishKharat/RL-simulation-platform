@@ -1,0 +1,37 @@
+{
+  "name": "phase4-balance_bot-disturbance",
+  "environments": [
+    {
+      "id": "balance_bot"
+    }
+  ],
+  "controllers": [
+    {
+      "id": "pid",
+      "params": {
+        "obs_index": 0,
+        "kp": 3.0,
+        "kd": 0.3
+      }
+    },
+    {
+      "id": "lqr"
+    }
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "episodes": 5,
+  "perturbation": {
+    "id": "disturbance",
+    "levels": [
+      0.25,
+      0.5,
+      1.0
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "name": "phase4-cartpole-param_scale",
+  "environments": [
+    {
+      "id": "cartpole"
+    }
+  ],
+  "controllers": [
+    {
+      "id": "pid"
+    },
+    {
+      "id": "lqr"
+    },
+    {
+      "id": "ppo"
+    }
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "episodes": 5,
+  "perturbation": {
+    "id": "param_scale",
+    "params": {
+      "targets": [
+        "masspole"
+      ]
+    },
+    "levels": [
+      0.5,
+      2.0,
+      4.0
+    ]
+  },
+  "training": {
+    "total_timesteps": 20000
+  }
+}

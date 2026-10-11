@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 280" width="460" height="280" font-family="sans-serif" font-size="11" role="img" aria-label="angle_error (cartpole)">
+<text x="64" y="18" font-size="13" fill="#1f2933">angle_error (cartpole)</text>
+<line x1="64" x2="444" y1="222.0" y2="222.0" stroke="#e4e7eb"/><text x="58" y="226.0" text-anchor="end" fill="#7b8794">0</text>
+<line x1="64" x2="444" y1="175.0" y2="175.0" stroke="#e4e7eb"/><text x="58" y="179.0" text-anchor="end" fill="#7b8794">0.0276</text>
+<line x1="64" x2="444" y1="128.0" y2="128.0" stroke="#e4e7eb"/><text x="58" y="132.0" text-anchor="end" fill="#7b8794">0.0553</text>
+<line x1="64" x2="444" y1="81.0" y2="81.0" stroke="#e4e7eb"/><text x="58" y="85.0" text-anchor="end" fill="#7b8794">0.0829</text>
+<line x1="64" x2="444" y1="34.0" y2="34.0" stroke="#e4e7eb"/><text x="58" y="38.0" text-anchor="end" fill="#7b8794">0.111</text>
+<rect x="89.3" y="204.1" width="76.0" height="17.9" fill="#3b6ea5"/>
+<line x1="127.3" x2="127.3" y1="208.5" y2="199.7" stroke="#1f2933" stroke-width="1.5"/><line x1="122.3" x2="132.3" y1="208.5" y2="208.5" stroke="#1f2933"/><line x1="122.3" x2="132.3" y1="199.7" y2="199.7" stroke="#1f2933"/>
+<text x="127.3" y="238" text-anchor="middle" fill="#1f2933">lqr</text>
+<rect x="216.0" y="210.2" width="76.0" height="11.8" fill="#3b6ea5"/>
+<line x1="254.0" x2="254.0" y1="212.7" y2="207.8" stroke="#1f2933" stroke-width="1.5"/><line x1="249.0" x2="259.0" y1="212.7" y2="212.7" stroke="#1f2933"/><line x1="249.0" x2="259.0" y1="207.8" y2="207.8" stroke="#1f2933"/>
+<text x="254.0" y="238" text-anchor="middle" fill="#1f2933">pid</text>
+<rect x="342.7" y="66.6" width="76.0" height="155.4" fill="#3b6ea5"/>
+<line x1="380.7" x2="380.7" y1="88.6" y2="44.6" stroke="#1f2933" stroke-width="1.5"/><line x1="375.7" x2="385.7" y1="88.6" y2="88.6" stroke="#1f2933"/><line x1="375.7" x2="385.7" y1="44.6" y2="44.6" stroke="#1f2933"/>
+<text x="380.7" y="238" text-anchor="middle" fill="#1f2933">ppo</text>
+<text x="64" y="272" fill="#7b8794">mean with 95% interval across seeds [rad]</text><line x1="64" x2="64" y1="34" y2="222" stroke="#7b8794"/></svg>

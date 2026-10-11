@@ -63,3 +63,13 @@ Additive; nothing above changes. A **suite** is a benchmark definition (spec ver
 | `GET /benchmarks/{suite_id}/paired?env_id=&metric=&a=&b=` | query | `SummaryOut` with `controller_id "a-b"` | Per-seed differences a - b over common valid seeds. |
 
 `GET /metrics` entries gained `ci_method` (`"t"` or `"bootstrap"`). Optional training tracking: set `RCL_MLFLOW_URI` to log training curves and checkpoints of trained runs to MLflow (the database remains the source of truth).
+
+## Phase 4 additions: robustness
+
+| Endpoint | Body / query | Response | Notes |
+|---|---|---|---|
+| `GET /perturbations` | none | `list[EntryInfo]` (`kind: "perturbation"`) | Same shape as `/environments`; `metadata` has `stage`, `magnitude_param`, `magnitude_unit`, `nominal_magnitude`, `action_spaces`. |
+| `POST /benchmarks` | `BenchmarkSpec` + optional `perturbation: {id, params, levels: [float]}` | as before | `levels` replace `params[magnitude_param]`; the nominal level is added. Training is nominal, the same trained policy is evaluated at every level. One experiment per level, same seeds. Errors are addressed `["body", "perturbation", ...]`. |
+| `GET /benchmarks/{suite_id}/robustness?env_id=&metric=` | `metric` default `success_rate` | `list[CurveOut]` | `CurveOut`: `{env_id, controller_id, metric_name, breakdown, points: [{level, mean, ci_low, ci_high, ci_method, n_valid, n_total, relative}]}`; NaN as `null`. 404 unknown suite, 422 if the suite has no sweep. `breakdown` is the first level above nominal where the mean falls below half the nominal mean (meaningful for `success_rate`). Failure counts: request `metric=failure_count` (a rate; times the episode count). |
+
+`GET .../summary` and `.../paired` of a sweep suite use the NOMINAL level only, so levels are never pooled across seeds.

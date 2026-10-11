@@ -1,0 +1,42 @@
+{
+  "name": "phase4-balance_bot-param_scale",
+  "environments": [
+    {
+      "id": "balance_bot"
+    }
+  ],
+  "controllers": [
+    {
+      "id": "pid",
+      "params": {
+        "obs_index": 0,
+        "kp": 3.0,
+        "kd": 0.3
+      }
+    },
+    {
+      "id": "lqr"
+    }
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "episodes": 5,
+  "perturbation": {
+    "id": "param_scale",
+    "params": {
+      "targets": [
+        "chassis_mass"
+      ]
+    },
+    "levels": [
+      0.5,
+      2.0,
+      4.0
+    ]
+  }
+}

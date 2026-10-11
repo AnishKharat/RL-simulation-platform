@@ -1,0 +1,38 @@
+{
+  "name": "phase4-cartpole-disturbance",
+  "environments": [
+    {
+      "id": "cartpole"
+    }
+  ],
+  "controllers": [
+    {
+      "id": "pid"
+    },
+    {
+      "id": "lqr"
+    },
+    {
+      "id": "ppo"
+    }
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "episodes": 5,
+  "perturbation": {
+    "id": "disturbance",
+    "levels": [
+      0.25,
+      0.5,
+      1.0
+    ]
+  },
+  "training": {
+    "total_timesteps": 20000
+  }
+}

@@ -36,6 +36,9 @@
 
 
 
+- **Q:** `recovery_time` uses a 2% band of `max(S, step_floor)` (1 mrad for CartPole and the balance bot), but success needs 0.02 rad and success ends the episode, so nearly every recovery is censored at `T_max - t_p` (Phase 4 benchmark). Options: (a) keep the definition and document that it is unusable on balance tasks; (b) use the task tolerance as the recovery band; (c) a per-task `recovery_band` in `TaskSpec`. | **Raised by:** orchestrator, 2026-10-11 | **Affects:** metrics DEFINITIONS.md, TaskSpec (core)
+  **Open.** (a) applied for now.
+
 <!-- Entry format:
 - **Q:** <question>  | **Raised by:** <agent/date> | **Affects:** <module/phase>
 -->
