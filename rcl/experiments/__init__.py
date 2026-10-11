@@ -7,8 +7,10 @@ from rcl.experiments.benchmark import (
     RobustnessSpec,
     Skipped,
     level_stacks,
+    nominal_rows,
     plan,
     run_benchmark,
+    sweep_axis,
 )
 from rcl.experiments.jobs import JobManager, run_stored_benchmark
 from rcl.experiments.manager import (
@@ -32,6 +34,8 @@ __all__ = [
     "Cell",
     "RobustnessSpec",
     "level_stacks",
+    "nominal_rows",
+    "sweep_axis",
     "execute_sweep",
     "Skipped",
     "plan",

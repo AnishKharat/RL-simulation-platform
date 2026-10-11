@@ -124,6 +124,30 @@ def level_stacks(
     ]
 
 
+def sweep_axis(spec: BenchmarkSpec, registry: Registry) -> tuple[str, str, float] | None:
+    """``(perturbation id, magnitude_param, nominal)`` of the spec's sweep, or None."""
+    if spec.perturbation is None:
+        return None
+    meta = registry.get("perturbation", spec.perturbation.id).metadata
+    return spec.perturbation.id, meta.magnitude_param, meta.nominal_magnitude
+
+
+def nominal_rows(
+    rows: list[dict[str, Any]], spec: BenchmarkSpec, registry: Registry
+) -> list[dict[str, Any]]:
+    """Metric rows for the comparison tables: for a sweep only the nominal level, so levels
+    are never pooled across seeds; ``rows`` unchanged without a sweep."""
+    axis = sweep_axis(spec, registry)
+    if axis is None:
+        return rows
+    pid, param, nominal = axis
+    return [
+        r
+        for r in rows
+        if any(p["id"] == pid and p["params"].get(param) == nominal for p in r["perturbations"])
+    ]
+
+
 @dataclass
 class Cell:
     """All seeds of one (environment, controller) pair, in ``spec.seeds`` order."""

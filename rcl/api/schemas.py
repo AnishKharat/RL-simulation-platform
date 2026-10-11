@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 class EntryInfo(BaseModel):
     id: str
-    kind: Literal["environment", "controller"]
+    kind: Literal["environment", "controller", "perturbation"]
     metadata: dict[str, Any]
     params_schema: dict[str, Any]
 
@@ -157,3 +157,24 @@ class SummaryOut(BaseModel):
     ci_high: float | None
     ci_method: str
     low_n: bool
+
+
+class CurvePointOut(BaseModel):
+    """One sweep level of a degradation curve; NaN values are sent as null."""
+
+    level: float
+    mean: float | None
+    ci_low: float | None
+    ci_high: float | None
+    ci_method: str
+    n_valid: int
+    n_total: int
+    relative: float | None
+
+
+class CurveOut(BaseModel):
+    env_id: str
+    controller_id: str
+    metric_name: str
+    breakdown: float | None  # first level above nominal where the mean falls below half nominal
+    points: list[CurvePointOut]

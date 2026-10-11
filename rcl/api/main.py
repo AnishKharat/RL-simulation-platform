@@ -10,12 +10,13 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 
-from rcl.analytics import SummaryRow, paired_difference, summarize
+from rcl.analytics import Curve, SummaryRow, degradation_curves, paired_difference, summarize
 from rcl.api.schemas import (
     BenchmarkDetail,
     BenchmarkSummaryItem,
     CreatedBenchmark,
     CreatedExperiment,
+    CurveOut,
     EntryInfo,
     ExperimentDetail,
     RunDetail,
@@ -32,8 +33,10 @@ from rcl.experiments import (
     MetricInfo,
     MlflowTracker,
     derive_seeds,
+    nominal_rows,
     plan,
     resolve_config,
+    sweep_axis,
 )
 from rcl.persistence import Repository
 from rcl.registry import (
@@ -84,6 +87,10 @@ def create_app(
     @app.get("/environments", response_model=list[EntryInfo])
     def list_environments(request: Request) -> list[dict[str, Any]]:
         return entries(request, "environment")
+
+    @app.get("/perturbations", response_model=list[EntryInfo])
+    def list_perturbations(request: Request) -> list[dict[str, Any]]:
+        return entries(request, "perturbation")
 
     @app.get("/controllers", response_model=list[EntryInfo])
     def list_controllers(request: Request) -> list[dict[str, Any]]:
@@ -203,7 +210,7 @@ def create_app(
         repo = request.app.state.repo
         if repo.get_suite(suite_id) is None:
             raise HTTPException(404, f"unknown benchmark {suite_id!r}")
-        rows = summarize(repo.suite_metric_rows(suite_id))
+        rows = summarize(_comparison_rows(request, suite_id))
         return [_summary_out(r) for r in rows if env_id is None or r.env_id == env_id]
 
     @app.get("/benchmarks/{suite_id}/paired", response_model=SummaryOut)
@@ -213,10 +220,52 @@ def create_app(
         repo = request.app.state.repo
         if repo.get_suite(suite_id) is None:
             raise HTTPException(404, f"unknown benchmark {suite_id!r}")
-        rows = repo.suite_metric_rows(suite_id)
+        rows = _comparison_rows(request, suite_id)
         return _summary_out(paired_difference(rows, env_id, metric, a, b))
 
+    @app.get("/benchmarks/{suite_id}/robustness", response_model=list[CurveOut])
+    def benchmark_robustness(
+        request: Request, suite_id: str, env_id: str | None = None, metric: str = "success_rate"
+    ) -> list[dict[str, Any]]:
+        st = request.app.state
+        found = st.repo.get_suite(suite_id)
+        if found is None:
+            raise HTTPException(404, f"unknown benchmark {suite_id!r}")
+        axis = sweep_axis(BenchmarkSpec.model_validate(found["spec"]), st.registry)
+        if axis is None:
+            raise HTTPException(422, "benchmark has no perturbation sweep")
+        curves = degradation_curves(st.repo.suite_metric_rows(suite_id), *axis, metric)
+        return [_curve_out(c) for c in curves if env_id is None or c.env_id == env_id]
+
+    def _comparison_rows(request: Request, suite_id: str) -> list[dict[str, Any]]:
+        st = request.app.state
+        rows = st.repo.suite_metric_rows(suite_id)
+        spec = BenchmarkSpec.model_validate(st.repo.get_suite(suite_id)["spec"])
+        return nominal_rows(rows, spec, st.registry)
+
     return app
+
+
+def _nan_none(v: Any) -> Any:
+    return None if isinstance(v, float) and math.isnan(v) else v
+
+
+def _curve_out(c: Curve) -> dict[str, Any]:
+    keys = ("mean", "ci_low", "ci_high", "ci_method", "n_valid", "n_total")
+    return {
+        "env_id": c.env_id,
+        "controller_id": c.controller_id,
+        "metric_name": c.metric_name,
+        "breakdown": _nan_none(c.breakdown),
+        "points": [
+            {
+                "level": p.level,
+                "relative": _nan_none(p.relative),
+                **{k: _nan_none(getattr(p.summary, k)) for k in keys},
+            }
+            for p in c.points
+        ],
+    }
 
 
 def _summary_out(row: SummaryRow) -> dict[str, Any]:

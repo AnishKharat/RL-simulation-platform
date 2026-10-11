@@ -13,15 +13,18 @@ import logging
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
-from rcl.analytics import Report, SummaryRow, build_report, summarize
+from rcl.analytics import Report, SummaryRow, build_report, degradation_curves, summarize
 from rcl.experiments import (
     METRIC_INFO,
     BenchmarkSpec,
     ConfigError,
     MlflowTracker,
+    nominal_rows,
     plan,
     run_stored_benchmark,
+    sweep_axis,
 )
 from rcl.persistence import Repository
 from rcl.registry import Registry, discover, get_registry
@@ -86,6 +89,22 @@ def _write_outputs(out: Path, rows: list[SummaryRow], report: Report) -> None:
         w.writerows([[getattr(r, k) for k in _CSV_FIELDS] for r in rows])
 
 
+def _write_robustness(out: Path, rows: list[dict[str, Any]], axis: tuple[str, str, float]) -> None:
+    """``robustness.csv``: one line per (env, controller, metric, level) of the sweep."""
+    fields = "env_id controller_id metric_name level mean ci_low ci_high n_valid relative".split()
+    metrics = sorted({r["metric_name"] for r in rows})
+    with (out / "robustness.csv").open("w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f, lineterminator="\n")
+        w.writerow([*fields, "breakdown"])
+        for m in metrics:
+            for c in degradation_curves(rows, *axis, m):
+                for p in c.points:
+                    w.writerow(
+                        [c.env_id, c.controller_id, m, p.level, p.summary.mean, p.summary.ci_low]
+                        + [p.summary.ci_high, p.summary.n_valid, p.relative, c.breakdown]
+                    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Returns 0 on success, 1 if any run failed (the report is still written), 2 for a bad
     specification (nothing is run)."""
@@ -107,11 +126,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     tracker = MlflowTracker(args.mlflow_uri) if args.mlflow_uri else None
     suite_id, bench_id = repo.create_suite(spec.name, spec.model_dump(mode="json"))
     run_stored_benchmark(repo, registry, bench_id, suite_id, spec, tracker)
-    summary = summarize(repo.suite_metric_rows(suite_id))
+    all_rows = repo.suite_metric_rows(suite_id)
+    summary = summarize(nominal_rows(all_rows, spec, registry))
     report = build_report(
         spec.name, spec.model_dump(mode="json"), summary, METRIC_INFO, [vars(k) for k in skipped]
     )
     _write_outputs(out, summary, report)
+    if (axis := sweep_axis(spec, registry)) is not None:
+        _write_robustness(out, all_rows, axis)
     sys.stdout.write(report.markdown)
     bench = repo.get_benchmark_run(bench_id) or {}
     log.info("report written to %s", out.resolve())

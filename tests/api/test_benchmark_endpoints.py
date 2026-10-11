@@ -88,3 +88,39 @@ def test_detail_lists_skipped_pairs_after_the_post_response(client):
         ("cartpole_discrete", "pid"),
         ("cartpole_discrete", "lqr"),
     }
+
+
+def test_perturbations_listing_and_robustness_endpoint(client):
+    perts = client.get("/perturbations").json()
+    noise = next(p for p in perts if p["id"] == "action_noise")
+    assert noise["kind"] == "perturbation"
+    assert noise["metadata"]["magnitude_param"] == "std"
+    assert "std" in noise["params_schema"]["properties"]
+
+    sweep = {"id": "action_noise", "levels": [0.5]}
+    body = post(client, environments=[{"id": "cartpole"}], seeds=[0, 1], perturbation=sweep).json()
+    suite = body["suite_id"]
+    assert wait(client, suite)["benchmark_runs"][0]["status"] == "done"
+
+    curves = client.get(f"/benchmarks/{suite}/robustness", params={"metric": "angle_error"}).json()
+    assert {c["controller_id"] for c in curves} == {"pid", "lqr"}
+    assert [p["level"] for p in curves[0]["points"]] == [0.0, 0.5]
+    assert curves[0]["points"][0]["relative"] == 1.0
+    # comparison tables use the nominal level only: 2 seeds, not 4 pooled runs
+    rows = client.get(f"/benchmarks/{suite}/summary", params={"env_id": "cartpole"}).json()
+    assert {r["n_total"] for r in rows if r["metric_name"] == "return"} == {2}
+    paired = client.get(
+        f"/benchmarks/{suite}/paired",
+        params={"env_id": "cartpole", "metric": "return", "a": "pid", "b": "lqr"},
+    ).json()
+    assert paired["n_total"] == 2
+
+
+def test_robustness_endpoint_errors(client):
+    assert client.get("/benchmarks/nope/robustness").status_code == 404
+    suite = post(client, seeds=[0], environments=[{"id": "cartpole"}]).json()["suite_id"]
+    wait(client, suite)
+    assert client.get(f"/benchmarks/{suite}/robustness").status_code == 422
+    bad = post(client, perturbation={"id": "nope", "levels": [1.0]})
+    assert bad.status_code == 422
+    assert bad.json()["detail"][0]["loc"] == ["body", "perturbation", "id"]
