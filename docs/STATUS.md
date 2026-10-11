@@ -8,9 +8,9 @@
 - **Stage 2 done:** `failure_count`, `recovery_time` (in the manager metric list) and pure degradation helpers (`breakdown_magnitude`, `relative_curve`, `mean_by_magnitude`) in `rcl/metrics/robustness.py`; cross-seed CIs for curves belong to Stage 3 analytics
 - **Stage 3 done:** `execute_sweep` (train once, evaluate under each level stack), `BenchmarkSpec.perturbation` (`RobustnessSpec`: id, params, levels; nominal level auto-added), one experiment per level in the suite, `suite_metric_rows` now carries `perturbations`, `rcl.analytics.degradation_curves` (per-level CI, relative, breakdown). In-memory `run_benchmark` rejects sweeps (stored runs only)
 - **Stages 4-6 done:** `/perturbations`, `/benchmarks/{id}/robustness`, Robustness dashboard page, perturbation modularity proof, six sweeps in `docs/benchmarks/phase4/` with an honest README. Opus review done; fixes: train-stage perturbations with SB3 auto-reset, `action_delay` continuous-only, params field on the page, breakdown only for success_rate, nominal run owns the sweep checkpoint, 422 for an unregistered sweep perturbation
-- **Next:** user decision on `recovery_time` band (docs/OPEN_QUESTIONS.md), then user confirms Phase 4 exit before tagging `phase-4-complete`
+- **Next:** user confirms Phase 4 exit, then tag `phase-4-complete` (NOT tagged yet). `recovery_time` band resolved (task tolerance)
 - **Known limits:** `obs_noise` std is in absolute observation units; `param_scale` is one value per run; no PyBullet run with perturbations yet; CI status not checked (no `gh` here)
 - **Phase 7:** marked out of scope for now (simulation-only)
 - **Env:** project `.venv`; checks via `.venv/Scripts/python`
-- **Checks:** pytest 345 pass | ruff clean | mypy clean | lint-imports 12 kept
+- **Checks:** pytest 347 pass | ruff clean | mypy clean | lint-imports 12 kept
 - **Last updated:** 2026-10-11 by orchestrator
