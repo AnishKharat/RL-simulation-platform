@@ -96,3 +96,16 @@ def test_action_perturbation_is_rejected_on_a_discrete_environment() -> None:
     with pytest.raises(ConfigError) as exc:
         execute(c)
     assert ("perturbations", 0, "id") in {(*e["loc"],) for e in exc.value.errors}
+
+
+def test_train_stage_perturbation_works_with_an_rl_controller():
+    config = ExperimentConfig(
+        name="train-pert",
+        seed=0,
+        environment={"id": "cartpole"},
+        controller={"id": "ppo"},
+        training={"total_timesteps": 256},
+        perturbations=[{"id": "obs_noise", "params": {"std": 0.01}, "apply_to": "both"}],
+        evaluation={"episodes": 1},
+    )
+    assert execute(config).train is not None

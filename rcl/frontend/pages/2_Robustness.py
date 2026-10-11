@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Any
 
@@ -37,6 +38,7 @@ def start(envs: list[dict[str, Any]], perts: list[dict[str, Any]]) -> None:
         "Perturbation", [p["id"] for p in ok], format_func=pert_names.__getitem__, key="rob-pert"
     )
     meta = next((p["metadata"] for p in ok if p["id"] == pert_id), None)
+    pert_schema: dict[str, Any] = next((p["params_schema"] for p in ok if p["id"] == pert_id), {})
     with st.form("rob-form"):
         name = st.text_input("Sweep name", value="robustness", key="rob-name")
         ctl_ids = st.multiselect(
@@ -49,6 +51,11 @@ def start(envs: list[dict[str, Any]], perts: list[dict[str, Any]]) -> None:
                 f"{meta['nominal_magnitude']:g} is always included."
             )
         text = st.text_input("Levels (comma-separated)", key="rob-levels")
+        params_text = st.text_area(
+            "Perturbation params (JSON, see schema below)", value="{}", key="rob-params"
+        )
+        if pert_schema:
+            st.caption(f"Schema: {json.dumps(pert_schema.get('properties', {}))}")
         n_seeds = int(st.number_input("Seeds", 1, 50, 5, 1, key="rob-seeds"))
         episodes = int(st.number_input("Evaluation episodes", 1, 100, 5, 1, key="rob-episodes"))
         steps = int(st.number_input("Training timesteps (RL)", 64, 5_000_000, 20_000, 1000))
@@ -57,8 +64,11 @@ def start(envs: list[dict[str, Any]], perts: list[dict[str, Any]]) -> None:
         return
     try:
         levels = parse_levels(text)
-    except ValueError as exc:
-        st.session_state["errors"] = [f"levels: {exc}"]
+        params = json.loads(params_text or "{}")
+        if not isinstance(params, dict):
+            raise ValueError("params must be a JSON object")
+    except ValueError as exc:  # json.JSONDecodeError is a ValueError
+        st.session_state["errors"] = [f"levels/params: {exc}"]
         return
     spec: dict[str, Any] = {
         "name": name,
@@ -66,7 +76,7 @@ def start(envs: list[dict[str, Any]], perts: list[dict[str, Any]]) -> None:
         "controllers": [{"id": i} for i in ctl_ids],
         "seeds": list(range(n_seeds)),
         "episodes": episodes,
-        "perturbation": {"id": pert_id, "levels": levels},
+        "perturbation": {"id": pert_id, "params": params, "levels": levels},
     }
     if any(c["metadata"]["requires_training"] for c in ctls if c["id"] in ctl_ids):
         spec["training"] = {"total_timesteps": steps}

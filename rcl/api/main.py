@@ -231,7 +231,10 @@ def create_app(
         found = st.repo.get_suite(suite_id)
         if found is None:
             raise HTTPException(404, f"unknown benchmark {suite_id!r}")
-        axis = sweep_axis(BenchmarkSpec.model_validate(found["spec"]), st.registry)
+        try:
+            axis = sweep_axis(BenchmarkSpec.model_validate(found["spec"]), st.registry)
+        except UnknownIdError as exc:
+            raise HTTPException(422, str(exc.args[0])) from None
         if axis is None:
             raise HTTPException(422, "benchmark has no perturbation sweep")
         curves = degradation_curves(st.repo.suite_metric_rows(suite_id), *axis, metric)
@@ -241,7 +244,10 @@ def create_app(
         st = request.app.state
         rows = st.repo.suite_metric_rows(suite_id)
         spec = BenchmarkSpec.model_validate(st.repo.get_suite(suite_id)["spec"])
-        return nominal_rows(rows, spec, st.registry)
+        try:
+            return nominal_rows(rows, spec, st.registry)
+        except UnknownIdError as exc:  # the sweep's perturbation is no longer registered
+            raise HTTPException(422, str(exc.args[0])) from None
 
     return app
 

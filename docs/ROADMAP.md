@@ -91,10 +91,10 @@ Design: `docs/architecture/phase4-robustness.md`, ADR 0021.
 - ☑ Manager builds the stack, rollout records perturbed steps, spec-only config_hash test
 - ☑ Robustness metrics (failure count, recovery time, degradation curves) + tests
 - ☑ Robustness benchmark suite (runner, persistence, analytics with CIs)
-- ☐ API (`/perturbations`, robustness endpoint) and dashboard robustness page
-- ☐ Modularity proof: dummy perturbation in a temporary package
-- ☐ Phase 4 benchmark (balance_bot, CartPole) and honest README
-- ☐ Opus review and fixes
+- ☑ API (`/perturbations`, robustness endpoint) and dashboard robustness page
+- ☑ Modularity proof: dummy perturbation in a temporary package
+- ☑ Phase 4 benchmark (balance_bot, CartPole) and honest README
+- ☑ Opus review and fixes
 
 ## Phases 5–7
 Break each deliverable (see `project_context.md` §7) into commit-sized steps: interface/ADR → implementation → tests → docs → tag.

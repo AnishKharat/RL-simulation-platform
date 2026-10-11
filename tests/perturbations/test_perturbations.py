@@ -114,3 +114,16 @@ def test_param_scale_scales_numeric_targets_without_mutating() -> None:
 def test_param_scale_rejects_unknown_or_non_numeric_target(target: str) -> None:
     with pytest.raises(ValueError, match="not a numeric"):
         ParamScale.apply({"flag": True}, {"targets": [target], "scale": 1.0})
+
+
+def test_unseeded_reset_after_a_seeded_one_continues_the_stream() -> None:
+    env = ObsNoise(CartPole(), std=0.1)  # SB3 vector envs auto-reset without a seed
+    env.reset(seed=3)
+    env.reset()  # must not raise
+    assert env._seeded
+
+
+def test_action_delay_is_continuous_only() -> None:
+    from rcl.core.types import ActionSpaceKind
+
+    assert ActionDelay.perturbation_metadata.action_spaces == (ActionSpaceKind.CONTINUOUS,)

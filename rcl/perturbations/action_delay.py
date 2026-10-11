@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from rcl.core.environment import BaseEnvironment
 from rcl.core.perturbation import StepPerturbation
-from rcl.core.types import PerturbationMetadata
+from rcl.core.types import ActionSpaceKind, PerturbationMetadata
 from rcl.registry import register_perturbation
 
 
@@ -29,6 +29,7 @@ class ActionDelay(StepPerturbation):
         magnitude_param="steps",
         magnitude_unit="control steps",
         nominal_magnitude=0.0,
+        action_spaces=(ActionSpaceKind.CONTINUOUS,),  # no neutral discrete action exists
     )
 
     def __init__(self, env: BaseEnvironment, position: int = 0, steps: int = 0) -> None:
@@ -37,7 +38,7 @@ class ActionDelay(StepPerturbation):
         self._queue: list[Any] = []
 
     def _zero(self) -> np.ndarray:
-        return np.zeros_like(self.action_space.sample())
+        return np.zeros(self.action_space.shape or ())
 
     def reset(
         self, *, seed: int | None = None, options: dict[str, Any] | None = None

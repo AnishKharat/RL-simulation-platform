@@ -26,7 +26,8 @@ class StepPerturbation(EnvWrapper):
     * ``position`` is the index in the perturbation stack; ``reset(seed=s)`` builds
       ``self.rng = default_rng(SeedSequence([s, position]))``, so the stream depends only on the
       episode seed and the stack position, never on the controller or the global RNG.
-      ``reset`` without a seed raises ``ValueError`` (no perturbation is ever unseeded).
+      the first ``reset`` without a seed raises ``ValueError`` (no perturbation is ever unseeded);
+      later unseeded resets (vector-env auto-reset) continue the same stream.
     * Draw a fixed number of random values per step, independent of action and state, and
       schedule discrete events by step index, so every controller sees the same sequence.
     * Set ``info["perturbed"] = True`` on each step at which a discrete event is injected.
@@ -39,10 +40,16 @@ class StepPerturbation(EnvWrapper):
         super().__init__(env)
         self.position = position
         self.rng = np.random.default_rng(0)
+        self._seeded = False
 
     def _seed_rng(self, seed: int | None) -> None:
         if seed is None:
-            raise ValueError(f"{type(self).__name__}.reset requires an explicit seed")
+            # SB3 vector envs auto-reset without a seed after the seeded first reset: keep the
+            # stream. A wrapper that was never seeded is still an error.
+            if not self._seeded:
+                raise ValueError(f"{type(self).__name__}.reset requires an explicit seed")
+            return
+        self._seeded = True
         self.rng = np.random.default_rng(np.random.SeedSequence([seed, self.position]))
 
 

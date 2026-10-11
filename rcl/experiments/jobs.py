@@ -8,7 +8,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Any
 
 from rcl.core.config import ExperimentConfig, PerturbationConfig
-from rcl.experiments.benchmark import BenchmarkSpec, level_stacks, plan
+from rcl.experiments.benchmark import BenchmarkSpec, level_stacks, plan, sweep_axis
 from rcl.experiments.manager import (
     RunResult,
     derive_seeds,
@@ -178,6 +178,8 @@ def run_stored_benchmark(
         repo.update_benchmark_run(bench_id, status="running")
         pairs, _ = plan(spec, registry)
         levels = level_stacks(spec, registry)
+        axis = sweep_axis(spec, registry)  # nominal level first: it owns checkpoint and progress
+        levels.sort(key=lambda lv: axis is not None and lv[0] != axis[2])
         stacks = [st for _, st in levels]
         queued: list[
             tuple[list[str], ExperimentConfig, int, list[list[PerturbationConfig]] | None]

@@ -101,7 +101,8 @@ def _write_robustness(out: Path, rows: list[dict[str, Any]], axis: tuple[str, st
                 for p in c.points:
                     w.writerow(
                         [c.env_id, c.controller_id, m, p.level, p.summary.mean, p.summary.ci_low]
-                        + [p.summary.ci_high, p.summary.n_valid, p.relative, c.breakdown]
+                        + [p.summary.ci_high, p.summary.n_valid, p.relative]
+                        + [c.breakdown if m == "success_rate" else ""]  # fraction metrics only
                     )
 
 
