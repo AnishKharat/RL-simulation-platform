@@ -14,6 +14,7 @@ from rcl.metrics.metrics import (
     wrap_angle,
 )
 from rcl.metrics.outcome import success_rate, time_to_success
+from rcl.metrics.robustness import failure_count, recovery_time
 
 # Phase 2 metrics join the manager's fixed list (selected by the manager, never by users).
 METRICS.update(
@@ -25,6 +26,8 @@ METRICS.update(
     steady_state_error=steady_state_error,
     energy_usage=energy_usage,
     control_effort=control_effort,
+    failure_count=failure_count,
+    recovery_time=recovery_time,
 )
 METRIC_INFO.extend(
     [
@@ -83,6 +86,20 @@ METRIC_INFO.extend(
             unit="action*s",
             higher_is_better=False,
             companions=[{"name": "control_effort_rate", "unit": "action"}],
+        ),
+        MetricInfo(
+            name="failure_count",
+            description="Fraction of episodes that ended in failure (terminated).",
+            unit="fraction",
+            higher_is_better=False,
+            ci_method="bootstrap",
+        ),
+        MetricInfo(
+            name="recovery_time",
+            description="Time from the first perturbation event to staying in the 2% band.",
+            unit="s",
+            higher_is_better=False,
+            ci_method="bootstrap",
         ),
     ]
 )

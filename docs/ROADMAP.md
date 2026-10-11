@@ -89,7 +89,7 @@ Design: `docs/architecture/phase4-robustness.md`, ADR 0021.
 - ☑ Perturbation registry kind, core base classes, import-linter contract + tests
 - ☑ Perturbation wrappers (obs/action noise, action delay, disturbance, param_scale) + tests
 - ☑ Manager builds the stack, rollout records perturbed steps, spec-only config_hash test
-- ☐ Robustness metrics (failure count, recovery time, degradation curves) + tests
+- ☑ Robustness metrics (failure count, recovery time, degradation curves) + tests
 - ☐ Robustness benchmark suite (runner, persistence, analytics with CIs)
 - ☐ API (`/perturbations`, robustness endpoint) and dashboard robustness page
 - ☐ Modularity proof: dummy perturbation in a temporary package
